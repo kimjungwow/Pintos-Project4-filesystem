@@ -64,20 +64,13 @@ start_process (void *f_name)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-
-
-
-  // char *token, *save_ptr, *token2;
-  //
-  // token = strtok_r (f_name, " ", &save_ptr);
-  // token2 = strtok_r(f_name, " ", &save_ptr);
-
-
-  // success = load (token, &if_.eip, &if_.esp);
   success = load (file_name, &if_.eip, &if_.esp);
 
-  /* If load failed, quit. */
-  // palloc_free_page (token);
+  //validate!
+
+ // a null pointer
+ // a pointer to unmapped virtual memory,
+ //  or a pointer to kernel virtual address space (above PHYS_BASE).
   palloc_free_page (file_name);
   if (!success)
     thread_exit ();
@@ -88,6 +81,8 @@ start_process (void *f_name)
      arguments on the stack in the form of a `struct intr_frame',
      we just point the stack pointer (%esp) to our stack frame
      and jump to it. */
+
+
   asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (&if_) : "memory");
   NOT_REACHED ();
 }
@@ -105,9 +100,21 @@ start_process (void *f_name)
 int
 process_wait (tid_t child_tid UNUSED)
 {
-  timer_sleep(100000);
+  timer_sleep((int64_t)100);
+  // int a = loop();
   // printf("echo: exit(-1)\n");
   return -1;
+}
+
+int
+loop()
+{
+  int num=100000,answer=3,i;
+  for (i =0;i<num;i++)
+  {
+    answer+=i;
+  }
+  return answer;
 }
 
 /* Free the current process's resources. */
@@ -116,14 +123,6 @@ process_exit (void)
 {
   struct thread *curr = thread_current ();
   uint32_t *pd;
-
-
-  char* temppointer = curr->process_stack;
-  // while(*temppointer!=0)
-  // {
-  //   printf("%c",*temppointer);
-  //   temppointer++;
-  // }
     /* Destroy the current process's page directory and switch back
 
      to the kernel-only page directory. */
@@ -145,7 +144,7 @@ process_exit (void)
     #ifdef USERPROG
     if((strcmp(thread_current()->name,"main")!=0)&&(strcmp(thread_current()->name,"halt")!=0))
     {
-      printf("%s:exit(%d)\n",thread_current()->name,thread_current()->status);
+      printf("%s: exit(%d)\n",thread_current()->name,thread_current()->returnstatus);
     }
     #endif
 
@@ -358,6 +357,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
+
 
   success = true;
 
