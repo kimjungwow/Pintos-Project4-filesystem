@@ -65,16 +65,6 @@ syscall_handler (struct intr_frame *f)
         thread_current()->returnstatus=get_user((uint8_t *)tempesp);
       else
         thread_current()->returnstatus=-1;
-
-      // if(tempesp>=PHYS_BASE)
-      //   {
-      //     thread_current()->returnstatus=-1;
-      //   }
-      // else
-      //   {
-      //     int status = *(int *)tempesp;
-      //     thread_current()->returnstatus=status;
-      //   }
       thread_exit ();
       break;
     }
@@ -104,8 +94,6 @@ syscall_handler (struct intr_frame *f)
           thread_current()->returnstatus=-1;
           thread_exit();
         }
-
-
       bool answer=false;
       if (*tempesp=='\0')
         {
@@ -120,22 +108,20 @@ syscall_handler (struct intr_frame *f)
           if (file == NULL)
             return TID_ERROR;
           strlcpy (file, *(char **)tempesp, PGSIZE);
-
-          // char* file = *tempesp;
           tempesp+=4;
           unsigned initial_size = *(unsigned *)tempesp;
-
           if((strlen(file)<=14)&&(strlen(file)>0))
           {
-            answer = filesys_create(file, initial_size);
-            answer=true;
+
+            // if(filesys_open(file)==NULL)
+            // {
+              // answer=true;
+              answer = filesys_create(file, initial_size);
+
+            // }
           }
         }
-
-
       f->eax=answer;
-      // f->esp-=4;
-      // *(bool *)(f->esp) = answer;
       break;
     }
     case SYS_REMOVE:
