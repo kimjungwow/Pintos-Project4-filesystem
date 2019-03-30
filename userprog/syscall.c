@@ -112,13 +112,8 @@ syscall_handler (struct intr_frame *f)
           unsigned initial_size = *(unsigned *)tempesp;
           if((strlen(file)<=14)&&(strlen(file)>0))
           {
+            answer = filesys_create(file, initial_size);
 
-            // if(filesys_open(file)==NULL)
-            // {
-              // answer=true;
-              answer = filesys_create(file, initial_size);
-
-            // }
           }
         }
       f->eax=answer;
@@ -130,7 +125,14 @@ syscall_handler (struct intr_frame *f)
       tempesp+=4;
       if(*tempesp>PHYS_BASE)
         thread_exit();
-      char* file = *tempesp;
+      char *file;
+
+      file = palloc_get_page (0);
+      if (file == NULL)
+        return TID_ERROR;
+      strlcpy (file, *(char **)tempesp, PGSIZE);
+      bool answer = filesys_remove(file);
+      f->eax=answer;
 
       break;
     }
@@ -140,8 +142,25 @@ syscall_handler (struct intr_frame *f)
       tempesp+=4;
       if(*tempesp>PHYS_BASE)
         thread_exit();
-      char* file = *tempesp;
+      char *file;
 
+      file = palloc_get_page (0);
+      if (file == NULL)
+        return TID_ERROR;
+      strlcpy (file, *(char **)tempesp, PGSIZE);
+      struct file* openedfile = filesys_open(file);
+      int fd;
+      if (openedfile==NULL)
+      {
+        fd=-1;
+      }
+      else
+      {
+        fd= thread_current()->nextfd;
+        thread_current()->fdtable[fd]=openedfile;
+        thread_current()->nextfd++;
+      }
+      f->eax=fd;
       break;
     }
     case SYS_FILESIZE:

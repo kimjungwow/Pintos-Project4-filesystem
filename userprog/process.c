@@ -82,6 +82,7 @@ start_process (void *f_name)
      we just point the stack pointer (%esp) to our stack frame
      and jump to it. */
 
+  thread_current()->nextfd=2;
 
   asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (&if_) : "memory");
   NOT_REACHED ();

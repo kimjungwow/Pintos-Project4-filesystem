@@ -98,6 +98,8 @@ struct thread
     uint32_t *pagedir;                  /* Page directory. */
     char *process_stack;
     int returnstatus;
+    struct file* fdtable[64];
+    int nextfd;
 #endif
 
     /* Owned by thread.c. */
