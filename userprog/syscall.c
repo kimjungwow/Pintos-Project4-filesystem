@@ -6,6 +6,33 @@
 #include "lib/user/syscall.h"
 #include "threads/vaddr.h"
 #include "lib/kernel/console.h"
+#include "filesys/file.h"
+#include "filesys/filesys.h"
+
+/* Reads a byte at user virtual address UADDR.
+   UADDR must be below PHYS_BASE.
+   Returns the byte value if successful, -1 if a segfault
+   occurred. */
+static int
+get_user (const uint8_t *uaddr)
+{
+  int result;
+  asm ("movl $1f, %0; movzbl %1, %0; 1:"
+       : "=&a" (result) : "m" (*uaddr));
+  return result;
+}
+
+/* Writes BYTE to user address UDST.
+   UDST must be below PHYS_BASE.
+   Returns true if successful, false if a segfault occurred. */
+static bool
+put_user (uint8_t *udst, uint8_t byte)
+{
+  int error_code;
+  asm ("movl $1f, %0; movb %b2, %1; 1:"
+       : "=&a" (error_code), "=m" (*udst) : "q" (byte));
+  return error_code != -1;
+}
 
 
 static void syscall_handler (struct intr_frame *);
@@ -22,6 +49,7 @@ syscall_handler (struct intr_frame *f)
 {
 
   uint32_t num = *(uint32_t *)f->esp;
+
   switch(num)
   {
     case SYS_HALT:
@@ -32,11 +60,21 @@ syscall_handler (struct intr_frame *f)
     case SYS_EXIT:
     {
       char* tempesp = (char *)f-> esp;
-
       tempesp+=4;
-      int status = *(int *)tempesp;
-      thread_current()->returnstatus=status;
-      // printf("exit: exit(%d)\n",status);
+      if (tempesp<PHYS_BASE)
+        thread_current()->returnstatus=get_user((uint8_t *)tempesp);
+      else
+        thread_current()->returnstatus=-1;
+
+      // if(tempesp>=PHYS_BASE)
+      //   {
+      //     thread_current()->returnstatus=-1;
+      //   }
+      // else
+      //   {
+      //     int status = *(int *)tempesp;
+      //     thread_current()->returnstatus=status;
+      //   }
       thread_exit ();
       break;
     }
@@ -45,7 +83,7 @@ syscall_handler (struct intr_frame *f)
       char* tempesp = (char *)f->esp;
       tempesp+=4;
       if(*tempesp>PHYS_BASE)
-        process_exit();
+        thread_exit();
       char* cmd_line = *tempesp;
       f->eax = (uint32_t)process_execute(cmd_line);
       break;
@@ -58,11 +96,46 @@ syscall_handler (struct intr_frame *f)
     {
       char* tempesp = (char *)f->esp;
       tempesp+=4;
-      if(*tempesp>PHYS_BASE)
-        process_exit();
-      char* file = *tempesp;
-      tempesp+=4;
-      unsigned initial_size = *(unsigned *)tempesp;
+      if(*(uint32_t *)tempesp>PHYS_BASE)
+        thread_exit();
+
+      if(get_user(*(uint8_t **)tempesp)==-1)
+        {
+          thread_current()->returnstatus=-1;
+          thread_exit();
+        }
+
+
+      bool answer=false;
+      if (*tempesp=='\0')
+        {
+          thread_current()->returnstatus=-1;
+          thread_exit ();
+        }
+      else
+        {
+          char *file;
+
+          file = palloc_get_page (0);
+          if (file == NULL)
+            return TID_ERROR;
+          strlcpy (file, *(char **)tempesp, PGSIZE);
+
+          // char* file = *tempesp;
+          tempesp+=4;
+          unsigned initial_size = *(unsigned *)tempesp;
+
+          if((strlen(file)<=14)&&(strlen(file)>0))
+          {
+            answer = filesys_create(file, initial_size);
+            answer=true;
+          }
+        }
+
+
+      f->eax=answer;
+      // f->esp-=4;
+      // *(bool *)(f->esp) = answer;
       break;
     }
     case SYS_REMOVE:
@@ -70,7 +143,7 @@ syscall_handler (struct intr_frame *f)
       char* tempesp = (char *)f->esp;
       tempesp+=4;
       if(*tempesp>PHYS_BASE)
-        process_exit();
+        thread_exit();
       char* file = *tempesp;
 
       break;
@@ -80,7 +153,7 @@ syscall_handler (struct intr_frame *f)
       char* tempesp = (char *)f->esp;
       tempesp+=4;
       if(*tempesp>PHYS_BASE)
-        process_exit();
+        thread_exit();
       char* file = *tempesp;
 
       break;
@@ -101,7 +174,7 @@ syscall_handler (struct intr_frame *f)
       int fd = *(int *)tempesp;
       tempesp+=4;
       if(*tempesp>PHYS_BASE)
-        process_exit();
+        thread_exit();
       // void* buffer = *(void *)tempesp;
 
       break;
@@ -114,7 +187,7 @@ syscall_handler (struct intr_frame *f)
       int fd = *(int *)tempesp;
       tempesp+=4;
       if(*(char**)tempesp>PHYS_BASE)
-        process_exit();
+        thread_exit();
       char *buffer = *(char **)tempesp;
       tempesp+=4;
       unsigned size = *(unsigned *)tempesp;

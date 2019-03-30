@@ -129,7 +129,8 @@ page_fault (struct intr_frame *f)
 
   // if(*f->esp==0)
   // {
-  process_exit();
+  thread_current()->returnstatus=-1;
+  thread_exit();
   // }
 
 
