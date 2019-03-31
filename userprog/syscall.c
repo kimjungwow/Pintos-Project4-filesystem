@@ -87,9 +87,12 @@ syscall_handler (struct intr_frame *f)
       char* tempesp = (char *)f->esp;
       tempesp+=4;
       if(*(uint32_t *)tempesp>PHYS_BASE)
+      {
+        thread_current()->returnstatus=-1;
         thread_exit();
+      }
 
-      if(get_user(*(uint8_t **)tempesp)==-1)
+      if((get_user(*(uint8_t **)tempesp)==-1)||(*tempesp==NULL))
         {
           thread_current()->returnstatus=-1;
           thread_exit();
@@ -140,8 +143,17 @@ syscall_handler (struct intr_frame *f)
     {
       char* tempesp = (char *)f->esp;
       tempesp+=4;
-      if(*tempesp>PHYS_BASE)
+      if(*(uint32_t *)tempesp>PHYS_BASE)
+      {
+        thread_current()->returnstatus=-1;
         thread_exit();
+      }
+
+      if((get_user(*(uint8_t **)tempesp)==-1)||(*tempesp==NULL))
+        {
+          thread_current()->returnstatus=-1;
+          thread_exit();
+        }
       char *file;
 
       file = palloc_get_page (0);
