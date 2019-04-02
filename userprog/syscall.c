@@ -223,7 +223,7 @@ syscall_handler (struct intr_frame *f)
 			thread_exit();
 		}
 		char *buffer;
-		buffer = tempesp;
+		buffer = *(char **)tempesp;
 		tempesp+=4;
 		unsigned size = *(unsigned *)tempesp;
 		unsigned i;
@@ -297,9 +297,18 @@ syscall_handler (struct intr_frame *f)
 
 		tempesp+=4;
 		int fd = *(int *)tempesp;
-		struct file* filetoclose = thread_current()->fdtable[fd];
-		file_close(filetoclose);
 
+		struct file* filetoclose = thread_current()->fdtable[fd];
+		if(filetoclose!=NULL)
+		{
+			thread_current()->fdtable[fd]=NULL;
+			file_close(filetoclose);
+		}
+		else
+		{
+			thread_current()->returnstatus=-1;
+			thread_exit();
+		}
 		break;
 	}
 	case SYS_MMAP:
