@@ -272,15 +272,46 @@ syscall_handler (struct intr_frame *f)
 			thread_current()->returnstatus=-1;
 			thread_exit();
 		}
+
 		char *buffer = *(char **)tempesp;
 		tempesp+=4;
-		unsigned size = *(unsigned *)tempesp;
+		unsigned size = *(unsigned *)tempesp, temp;
 		if(fd==1)
+		{
+			while(size>100)
+			{
+				putbuf(buffer,100);
+				buffer+=100;
+				size-=100;
+			}
 			putbuf(buffer,size);
-
-		// char* enter="\n";
-		// putbuf(enter,1);
-
+		}
+		else
+		{
+			if (fd<=0)
+			{
+				thread_current()->returnstatus=-1;
+				thread_exit();
+			}
+			else if(fd>sizeof(thread_current()->fdtable)/sizeof(struct file*))
+			{
+				thread_current()->returnstatus=-1;
+				thread_exit();
+			}
+			else if(thread_current()->fdtable[fd]==NULL)
+			{
+				thread_current()->returnstatus=-1;
+				thread_exit();
+			}
+			else if((get_user((uint8_t *)buffer)==-1)||(buffer==NULL))
+			{
+				thread_current()->returnstatus=-1;
+				thread_exit();
+			}
+			struct file* filetowrite = thread_current()->fdtable[fd];
+			off_t writebytes = file_write(filetowrite,(void *) buffer, (off_t)size);
+			f->eax=(int)writebytes;
+		}
 		break;
 	}
 	case SYS_SEEK:
