@@ -67,7 +67,7 @@ process_execute (const char *file_name)
 	if(!child_load_success)
 	{
 		//For exec-missing case
-		// sema_down(&child->exitsem);
+		sema_down(&child->exitsem);
 		return -1;
 	}
 	if (tid == TID_ERROR)
@@ -186,6 +186,7 @@ process_exit (void)
 		// if(!list_empty(&curr->exitsem.waiters))
 
 	}
+	file_close (curr->file);
 
 
 
@@ -307,16 +308,17 @@ load (const char *file_name, void (**eip) (void), void **esp)
 	char *token, *save_ptr;
 	token = strtok_r(file_name, " ", &save_ptr);
 
-
-
-	// file = filesys_open (file_name);
-
 	file = filesys_open (token);
+
 	if (file == NULL)
 	{
 		printf ("load: %s: open failed\n", file_name);
 		goto done;
 	}
+	file_deny_write(file);
+	t->file=file;
+
+
 
 	/* Read and verify executable header. */
 	if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -404,7 +406,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
 done:
 	/* We arrive here whether the load is successful or not. */
 
-	file_close (file);
 	return success;
 }
 

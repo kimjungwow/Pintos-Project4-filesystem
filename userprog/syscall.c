@@ -80,6 +80,8 @@ syscall_handler (struct intr_frame *f)
 		if (cmd_line == NULL)
 			return TID_ERROR;
 		strlcpy (cmd_line, *(char **)tempesp, PGSIZE);
+		struct file* openedfile = filesys_open(cmd_line);
+
 		f->eax = (int)process_execute(cmd_line);
 		break;
 	}
@@ -196,6 +198,7 @@ syscall_handler (struct intr_frame *f)
 		}
 		else
 		{
+
 			fd= thread_current()->nextfd;
 			thread_current()->fdtable[fd]=openedfile;
 			thread_current()->nextfd++;
@@ -228,6 +231,12 @@ syscall_handler (struct intr_frame *f)
 		int fd = *(int *)tempesp;
 		tempesp+=4;
 		if(*(uint32_t *)tempesp>PHYS_BASE)
+		{
+			thread_current()->returnstatus=-1;
+			thread_exit();
+		}
+
+		if((get_user(*(uint8_t **)tempesp)==-1)||(*tempesp==NULL)||(tempesp==NULL))
 		{
 			thread_current()->returnstatus=-1;
 			thread_exit();
@@ -326,11 +335,36 @@ syscall_handler (struct intr_frame *f)
 	}
 	case SYS_SEEK:
 	{
-		break;
+		char* tempesp = (char *)f->esp;
+
+		tempesp+=4;
+		int fd = *(int *)tempesp;
+		tempesp+=4;
+		unsigned position = *(unsigned *)tempesp;
+		struct file* filetoseek = thread_current()->fdtable[fd];
+		if(filetoseek==NULL)
+			break;
+		else
+		{
+			file_seek(filetoseek,(off_t)position);
+			break;
+		}
+
 	}
 	case SYS_TELL:
 	{
-		break;
+		char* tempesp = (char *)f->esp;
+
+		tempesp+=4;
+		int fd = *(int *)tempesp;
+		struct file* filetotell = thread_current()->fdtable[fd];
+		if(filetotell==NULL)
+			break;
+		else
+		{
+			f->eax=(unsigned)file_tell(filetotell);
+			break;
+		}
 	}
 	case SYS_CLOSE:
 	{

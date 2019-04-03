@@ -108,6 +108,7 @@ struct thread
     struct semaphore diesem;
     struct semaphore exitsem;
     bool loadsuccess;
+    struct file* file;
 #endif
 
     /* Owned by thread.c. */
