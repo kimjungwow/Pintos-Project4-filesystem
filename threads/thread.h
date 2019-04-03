@@ -4,7 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
-
+#include "synch.h"
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -100,11 +100,30 @@ struct thread
     int returnstatus;
     struct file* fdtable[64];
     int nextfd;
+    struct list childrenlist;
+    struct list_elem child_elem;
+    struct semaphore loadsem;
+    struct semaphore loadsuccesssem;
+    struct semaphore waitsem;
+    struct semaphore diesem;
+    struct semaphore exitsem;
+    bool loadsuccess;
 #endif
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
+
+// struct syscall_thread
+// {
+//   tid_t tid;
+//   int answer;
+//   struct list_elem sys_elem;
+//   struct semaphore waitsem;
+//   struct semaphore loadsem;
+//
+//
+// };
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.

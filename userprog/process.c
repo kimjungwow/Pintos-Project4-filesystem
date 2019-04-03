@@ -21,6 +21,22 @@
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
+struct thread* find_child(tid_t giventid)
+{
+	struct list* templist = &thread_current()->childrenlist;
+	if(list_empty(templist))
+		return NULL;
+	struct list_elem* e;
+	for (e = list_begin (templist); e != list_end (templist);
+			 e = list_next (e))
+		{
+			struct thread *t = list_entry (e, struct thread, child_elem);
+			if(t->tid==giventid)
+				return t;
+		}
+	return NULL;
+}
+
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -44,7 +60,16 @@ process_execute (const char *file_name)
 
 	/* Create a new thread to execute FILE_NAME. */
 	tid = thread_create (token, PRI_DEFAULT, start_process, fn_copy);
-	// tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+	struct thread* child = find_child(tid);
+	sema_down(&child->loadsem);
+	bool child_load_success = child->loadsuccess;
+	sema_up(&child->loadsuccesssem);
+	if(!child_load_success)
+	{
+		//For exec-missing case
+		// sema_down(&child->exitsem);
+		return -1;
+	}
 	if (tid == TID_ERROR)
 		palloc_free_page (fn_copy);
 	return tid;
@@ -66,14 +91,16 @@ start_process (void *f_name)
 	if_.eflags = FLAG_IF | FLAG_MBS;
 	success = load (file_name, &if_.eip, &if_.esp);
 
-	//validate!
+	thread_current()->loadsuccess=success;
+	sema_up(&thread_current()->loadsem);
+	sema_down(&thread_current()->loadsuccesssem);
 
-	// a null pointer
-	// a pointer to unmapped virtual memory,
-	//  or a pointer to kernel virtual address space (above PHYS_BASE).
 	palloc_free_page (file_name);
 	if (!success)
+	{
+		thread_current()->returnstatus=-1;
 		thread_exit ();
+	}
 
 	/* Start the user process by simulating a return from an
 	   interrupt, implemented by intr_exit (in
@@ -99,12 +126,19 @@ start_process (void *f_name)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED)
+process_wait (tid_t child_tid)
 {
-	timer_sleep((int64_t)100);
-	// int a = loop();
-	// printf("echo: exit(-1)\n");
-	return -1;
+	// timer_sleep((int64_t)100);
+	struct thread* child = find_child(child_tid);
+	if(child==NULL)
+	{
+		return -1;
+	}
+	sema_down(&child->waitsem);
+	int exitstatus = child->returnstatus;
+	sema_up(&child->diesem);
+
+	return exitstatus;
 }
 
 int
@@ -140,12 +174,19 @@ process_exit (void)
 		curr->pagedir = NULL;
 		pagedir_activate (NULL);
 		pagedir_destroy (pd);
+		sema_up(&curr->exitsem);
 	}
 
-				#ifdef USERPROG
-	if(strcmp(thread_current()->name,"main")!=0)
-		printf("%s: exit(%d)\n",thread_current()->name,thread_current()->returnstatus);
-				#endif
+	if(strcmp(curr->name,"main")!=0)
+	{
+		printf("%s: exit(%d)\n",curr->name,curr->returnstatus);
+		list_remove(&curr->child_elem);
+		sema_up(&curr->waitsem);
+		sema_down(&curr->diesem);
+		// if(!list_empty(&curr->exitsem.waiters))
+
+	}
+
 
 
 }

@@ -74,8 +74,13 @@ syscall_handler (struct intr_frame *f)
 		tempesp+=4;
 		if(*(uint32_t *)tempesp>PHYS_BASE)
 			thread_exit();
-		char* cmd_line = *tempesp;
-		f->eax = (uint32_t)process_execute(cmd_line);
+		char *cmd_line;
+
+		cmd_line = palloc_get_page (0);
+		if (cmd_line == NULL)
+			return TID_ERROR;
+		strlcpy (cmd_line, *(char **)tempesp, PGSIZE);
+		f->eax = (int)process_execute(cmd_line);
 		break;
 	}
 
@@ -98,6 +103,11 @@ syscall_handler (struct intr_frame *f)
 
 	case SYS_WAIT:
 	{
+		char* tempesp = (char *)f->esp;
+
+		tempesp+=4;
+		pid_t pid = *(pid_t *)tempesp;
+		f->eax = process_wait((tid_t)pid);
 		break;
 	}
 	case SYS_CREATE:
