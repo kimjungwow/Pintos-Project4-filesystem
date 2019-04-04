@@ -136,6 +136,7 @@ process_wait (tid_t child_tid)
 	}
 	sema_down(&child->waitsem);
 	int exitstatus = child->returnstatus;
+
 	sema_up(&child->diesem);
 
 	return exitstatus;

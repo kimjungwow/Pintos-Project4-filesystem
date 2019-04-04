@@ -126,13 +126,9 @@ page_fault (struct intr_frame *f)
   bool write;        /* True: access was write, false: access was read. */
   bool user;         /* True: access by user, false: access by kernel. */
   void *fault_addr;  /* Fault address. */
-
-  // if(*f->esp==0)
-  // {
+  
   thread_current()->returnstatus=-1;
   thread_exit();
-  // }
-
 
   *(uint32_t*)f->eip=f->eax;
   f->eax =0xffffffff;
