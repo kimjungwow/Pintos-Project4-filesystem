@@ -36,10 +36,13 @@ put_user (uint8_t *udst, uint8_t byte)
 
 
 static void syscall_handler (struct intr_frame *);
-
+static struct semaphore handlesem;
+bool already = false;
 void
 syscall_init (void)
 {
+
+	sema_init(&handlesem,1);
 	intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 
 }
@@ -213,7 +216,9 @@ syscall_handler (struct intr_frame *f)
 		tempesp+=4;
 		int fd = *(int *)tempesp;
 		struct file* filetoread = thread_current()->fdtable[fd];
+		sema_down(&handlesem);
 		int filesize = (int)(file_length(filetoread));
+		sema_up(&handlesem);
 		f->eax=filesize;
 		break;
 	}
@@ -272,8 +277,14 @@ syscall_handler (struct intr_frame *f)
 				}
 				else
 				{
+					sema_down(&handlesem);
 					off_t readbytes = file_read(filetoread,(void *) buffer, (off_t)size);
+
 					f->eax=(int)readbytes;
+					sema_up(&handlesem);
+
+
+
 				}
 			}
 		}
@@ -328,7 +339,9 @@ syscall_handler (struct intr_frame *f)
 				thread_exit();
 			}
 			struct file* filetowrite = thread_current()->fdtable[fd];
+			sema_down(&handlesem);
 			off_t writebytes = file_write(filetowrite,(void *) buffer, (off_t)size);
+			sema_up(&handlesem);
 			f->eax=(int)writebytes;
 		}
 		break;
@@ -346,7 +359,9 @@ syscall_handler (struct intr_frame *f)
 			break;
 		else
 		{
+			sema_down(&handlesem);
 			file_seek(filetoseek,(off_t)position);
+			sema_up(&handlesem);
 			break;
 		}
 
@@ -377,7 +392,9 @@ syscall_handler (struct intr_frame *f)
 		if(filetoclose!=NULL)
 		{
 			thread_current()->fdtable[fd]=NULL;
+			sema_down(&handlesem);
 			file_close(filetoclose);
+			sema_up(&handlesem);
 		}
 		else
 		{

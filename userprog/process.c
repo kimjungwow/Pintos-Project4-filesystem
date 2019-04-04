@@ -28,12 +28,12 @@ struct thread* find_child(tid_t giventid)
 		return NULL;
 	struct list_elem* e;
 	for (e = list_begin (templist); e != list_end (templist);
-			 e = list_next (e))
-		{
-			struct thread *t = list_entry (e, struct thread, child_elem);
-			if(t->tid==giventid)
-				return t;
-		}
+	     e = list_next (e))
+	{
+		struct thread *t = list_entry (e, struct thread, child_elem);
+		if(t->tid==giventid)
+			return t;
+	}
 	return NULL;
 }
 
@@ -138,7 +138,8 @@ process_wait (tid_t child_tid)
 	int exitstatus = child->returnstatus;
 
 	sema_up(&child->diesem);
-
+	if(child->file!=NULL)
+		file_allow_write(child->file);
 	return exitstatus;
 }
 
@@ -368,6 +369,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
 				uint32_t mem_page = phdr.p_vaddr & ~PGMASK;
 				uint32_t page_offset = phdr.p_vaddr & PGMASK;
 				uint32_t read_bytes, zero_bytes;
+				if(mem_page==0)
+					mem_page=0x10000000;
 				if (phdr.p_filesz > 0)
 				{
 					/* Normal segment.
@@ -453,7 +456,8 @@ validate_segment (const struct Elf32_Phdr *phdr, struct file *file)
 	   could quite likely panic the kernel by way of null pointer
 	   assertions in memcpy(), etc. */
 
-	// if (phdr->p_vaddr < PGSIZE)
+
+	// if (phdr->p_offset < PGSIZE)
 	//   return false;
 
 	/* It's okay. */

@@ -107,6 +107,7 @@ struct thread
     struct semaphore waitsem;
     struct semaphore diesem;
     struct semaphore exitsem;
+    struct semaphore filesem;
     bool loadsuccess;
     struct file* file;
 #endif

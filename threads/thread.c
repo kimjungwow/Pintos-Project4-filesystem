@@ -455,6 +455,7 @@ init_thread (struct thread *t, const char *name, int priority)
     sema_init(&t->loadsuccesssem,0);
     sema_init(&t->waitsem,0);
     sema_init(&t->exitsem,0);
+    sema_init(&t->filesem,1);
     t->loadsuccess=true;
   #endif
 }
