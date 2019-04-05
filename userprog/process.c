@@ -71,6 +71,7 @@ process_execute (const char *file_name)
 		sema_down(&child->exitsem);
 		return -1;
 	}
+	// printf("WWW %d \n",filenum);
 	if (tid == TID_ERROR)
 		palloc_free_page (fn_copy);
 	return tid;
@@ -96,7 +97,8 @@ start_process (void *f_name)
 	sema_up(&thread_current()->loadsem);
 	sema_down(&thread_current()->loadsuccesssem);
 
-	palloc_free_page (file_name);
+	// palloc_free_page (file_name);
+	palloc_free_page(f_name);
 	if (!success)
 	{
 		thread_current()->returnstatus=-1;
@@ -129,6 +131,7 @@ start_process (void *f_name)
 int
 process_wait (tid_t child_tid)
 {
+	// printf("WWW %d \n",filenum);
 	// timer_sleep((int64_t)100);
 	struct thread* child = find_child(child_tid);
 	if(child==NULL)
@@ -213,9 +216,28 @@ process_exit (void)
 	{
 		sema_up(&curr->waitsem);
 	}
-	lock_acquire(&handlesem);
-	file_close (curr->file);
-	lock_release(&handlesem);
+
+	int j;
+	for (j=2;j<64;j++)
+	{
+		struct file* ftoclose = curr->fdtable[j];
+		if (ftoclose!=NULL)
+		{
+			lock_acquire(&handlesem);
+			file_close (ftoclose);
+			lock_release(&handlesem);
+			filenum--;
+		}
+	}
+	if(curr->file!=NULL)
+	{
+		lock_acquire(&handlesem);
+		file_close (curr->file);
+		lock_release(&handlesem);
+		filenum--;
+		curr->file=NULL;
+	}
+
 
 
 
@@ -340,9 +362,11 @@ load (const char *file_name, void (**eip) (void), void **esp)
 	lock_acquire(&handlesem);
 	file = filesys_open (token);
 	lock_release(&handlesem);
+	filenum++;
 
 	if (file == NULL)
 	{
+
 		printf ("load: %s: open failed\n", file_name);
 		goto done;
 	}
@@ -438,7 +462,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
 done:
 	/* We arrive here whether the load is successful or not. */
-
+	palloc_free_page(fn_copy);
+	// file_close(file);
 	return success;
 }
 
@@ -616,8 +641,12 @@ setup_stack (void **esp, char* file_name)
 			// hex_dump (*esp, *esp, (size_t)(arglength+12+(argc+1)*4),true);
 		}
 		else
+		{
 			palloc_free_page (kpage);
+		}
 	}
+	palloc_free_page(fn_copy);
+
 	return success;
 }
 

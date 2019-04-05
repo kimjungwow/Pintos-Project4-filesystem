@@ -127,8 +127,7 @@ page_fault (struct intr_frame *f)
   bool user;         /* True: access by user, false: access by kernel. */
   void *fault_addr;  /* Fault address. */
 
-  thread_current()->returnstatus=-1;
-  thread_exit();
+
 
 
   /* Obtain faulting address, the virtual address that was
@@ -154,9 +153,12 @@ page_fault (struct intr_frame *f)
 
   if(!user)
   {
-    *(uint32_t*)f->eip=f->eax;
+    f->eip=f->eax;
     f->eax =0xffffffff;
+    return;
   }
+  thread_current()->returnstatus=-1;
+  thread_exit();
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
@@ -166,4 +168,5 @@ page_fault (struct intr_frame *f)
           write ? "writing" : "reading",
           user ? "user" : "kernel");
   kill (f);
+
 }

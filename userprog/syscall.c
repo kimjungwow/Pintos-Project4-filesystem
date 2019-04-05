@@ -21,7 +21,6 @@ get_user (const uint8_t *uaddr)
 	     : "=&a" (result) : "m" (*uaddr));
 	return result;
 }
-
 /* Writes BYTE to user address UDST.
    UDST must be below PHYS_BASE.
    Returns true if successful, false if a segfault occurred. */
@@ -39,6 +38,7 @@ static void syscall_handler (struct intr_frame *);
 struct lock handlesem;
 bool already = false;
 bool jungwoo=false;
+int filenum=0;
 
 void
 syscall_init (void)
@@ -50,7 +50,11 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f)
 {
-
+	if((f->esp>PHYS_BASE)||(get_user((uint8_t *)f->esp)==-1))
+	{
+		thread_current()->returnstatus=-1;
+		thread_exit();
+	}
 	uint32_t num = *(uint32_t *)f->esp;
 
 	switch(num)
@@ -76,25 +80,43 @@ syscall_handler (struct intr_frame *f)
 		char* tempesp = (char *)f->esp;
 		tempesp+=4;
 		if(*(uint32_t *)tempesp>PHYS_BASE)
+		{
+			thread_current()->returnstatus=-1;
 			thread_exit();
+		}
+		if((*tempesp==NULL)||(get_user(*(uint8_t **)tempesp)==-1))
+		{
+			thread_current()->returnstatus=-1;
+			thread_exit();
+		}
 		char *cmd_line;
 
 		cmd_line = palloc_get_page (0);
+
 		if (cmd_line == NULL)
-			return -1;
+		{
+			f->eax=-1;
+			break;
+			// return -1;
+		}
 		strlcpy (cmd_line, *(char **)tempesp, PGSIZE);
 
 
-		lock_acquire(&handlesem);
-		struct file* openedfile = filesys_open(cmd_line);
-		lock_release(&handlesem);
+		// lock_acquire(&handlesem);
+		// struct file* openedfile = filesys_open(cmd_line);
+		// lock_release(&handlesem);
 
 
 		int answer = (int)process_execute(cmd_line);
 
 		f->eax = answer;
+		// file_close(openedfile);
+		palloc_free_page(cmd_line);
+
+
 
 		break;
+
 	}
 
 /*Waits for a child process pid and retrieves the child's exit status.
@@ -135,7 +157,7 @@ syscall_handler (struct intr_frame *f)
 			thread_exit();
 		}
 
-		if((get_user(*(uint8_t **)tempesp)==-1)||(*tempesp==NULL))
+		if((*tempesp==NULL)||(get_user(*(uint8_t **)tempesp)==-1))
 		{
 			thread_current()->returnstatus=-1;
 			thread_exit();
@@ -152,7 +174,11 @@ syscall_handler (struct intr_frame *f)
 
 			file = palloc_get_page (0);
 			if (file == NULL)
-				return -1;
+			{
+				f->eax=-1;
+				break;
+				// return -1;
+			}
 			strlcpy (file, *(char **)tempesp, PGSIZE);
 			tempesp+=4;
 			unsigned initial_size = *(unsigned *)tempesp;
@@ -162,6 +188,7 @@ syscall_handler (struct intr_frame *f)
 				answer = filesys_create(file, initial_size);
 				lock_release(&handlesem);
 			}
+			palloc_free_page(file);
 		}
 		f->eax=answer;
 		break;
@@ -176,13 +203,18 @@ syscall_handler (struct intr_frame *f)
 
 		file = palloc_get_page (0);
 		if (file == NULL)
-			return -1;
+		{
+			f->eax=-1;
+			break;
+			// return -1;
+		}
 		strlcpy (file, *(char **)tempesp, PGSIZE);
 		lock_acquire(&handlesem);
 		bool answer = filesys_remove(file);
 		lock_release(&handlesem);
 
 		f->eax=answer;
+		palloc_free_page(file);
 
 		break;
 	}
@@ -207,26 +239,49 @@ syscall_handler (struct intr_frame *f)
 
 		file = palloc_get_page (0);
 		if (file == NULL)
-			return -1;
+		{
+			f->eax=-1;
+			break;
+			// return -1;
+		}
 		strlcpy (file, *(char **)tempesp, PGSIZE);
 
 		lock_acquire(&handlesem);
 		struct file* openedfile = filesys_open(file);
 		lock_release(&handlesem);
+		filenum++;
+		palloc_free_page(file);
 
 		int fd;
 		if (openedfile==NULL)
 		{
 			fd=-1;
-			palloc_free_page(file);
+			// palloc_free_page(file);
 			// f->eax=fd;
 		}
 		else
 		{
 
 			fd= thread_current()->nextfd;
-			thread_current()->fdtable[fd]=openedfile;
-			thread_current()->nextfd++;
+			if(fd>=64)
+			{
+				fd=-1;
+
+				lock_acquire(&handlesem);
+
+				file_close(openedfile);
+				lock_release(&handlesem);
+				filenum--;
+				// palloc_free_page(file);
+
+
+			} else
+			{
+				// printf("%d WOO\n",fd);
+				thread_current()->fdtable[fd]=openedfile;
+
+				thread_current()->nextfd++;
+			}
 
 		}
 		f->eax=fd;
@@ -269,6 +324,11 @@ syscall_handler (struct intr_frame *f)
 		tempesp+=4;
 		int fd = *(int *)tempesp;
 		tempesp+=4;
+		if((fd<0)||(fd>64))
+		{
+			thread_current()->returnstatus=-1;
+			thread_exit();
+		}
 		if(*(uint32_t *)tempesp>PHYS_BASE)
 		{
 			thread_current()->returnstatus=-1;
@@ -429,6 +489,11 @@ syscall_handler (struct intr_frame *f)
 
 		tempesp+=4;
 		int fd = *(int *)tempesp;
+		if((fd<0)||(fd>64))
+		{
+			thread_current()->returnstatus=-1;
+			thread_exit();
+		}
 
 		struct file* filetoclose = thread_current()->fdtable[fd];
 		if(filetoclose!=NULL)
@@ -437,6 +502,7 @@ syscall_handler (struct intr_frame *f)
 			lock_acquire(&handlesem);
 			file_close(filetoclose);
 			lock_release(&handlesem);
+			filenum--;
 		}
 		else
 		{
