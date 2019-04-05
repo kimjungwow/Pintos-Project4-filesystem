@@ -17,10 +17,11 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "syscall.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
-
+int a=0;
 struct thread* find_child(tid_t giventid)
 {
 	struct list* templist = &thread_current()->childrenlist;
@@ -135,11 +136,28 @@ process_wait (tid_t child_tid)
 		return -1;
 	}
 	sema_down(&child->waitsem);
-	int exitstatus = child->returnstatus;
 
-	sema_up(&child->diesem);
-	if(child->file!=NULL)
+	// printf("child name : %s\n", child->name);
+
+	if(child->wait)
+	{
+		return -1;
+	}
+	child->wait=true;
+
+	int exitstatus = child->returnstatus;
+	if(child->file!=NULL) {
+		lock_acquire(&handlesem);
 		file_allow_write(child->file);
+		lock_release(&handlesem);
+	}
+	sema_up(&child->diesem);
+	// printf("ABOVE JIN\n");
+	sema_down(&child->jinsem);
+	// printf("BELOW JIN\n");
+
+
+	child->wait=false;
 	return exitstatus;
 }
 
@@ -182,13 +200,22 @@ process_exit (void)
 	if(strcmp(curr->name,"main")!=0)
 	{
 		printf("%s: exit(%d)\n",curr->name,curr->returnstatus);
-		list_remove(&curr->child_elem);
+
 		sema_up(&curr->waitsem);
 		sema_down(&curr->diesem);
+		list_remove(&curr->child_elem);
+		sema_up(&curr->jinsem);
+
 		// if(!list_empty(&curr->exitsem.waiters))
 
 	}
+	else
+	{
+		sema_up(&curr->waitsem);
+	}
+	lock_acquire(&handlesem);
 	file_close (curr->file);
+	lock_release(&handlesem);
 
 
 
@@ -310,7 +337,9 @@ load (const char *file_name, void (**eip) (void), void **esp)
 	char *token, *save_ptr;
 	token = strtok_r(file_name, " ", &save_ptr);
 
+	lock_acquire(&handlesem);
 	file = filesys_open (token);
+	lock_release(&handlesem);
 
 	if (file == NULL)
 	{
@@ -457,7 +486,8 @@ validate_segment (const struct Elf32_Phdr *phdr, struct file *file)
 	   assertions in memcpy(), etc. */
 
 
-	// if (phdr->p_offset < PGSIZE)
+
+	// if (phdr->p_vaddr < PGSIZE)
 	//   return false;
 
 	/* It's okay. */

@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "synch.h"
+
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -108,8 +109,10 @@ struct thread
     struct semaphore diesem;
     struct semaphore exitsem;
     struct semaphore filesem;
+    struct semaphore jinsem;
     bool loadsuccess;
     struct file* file;
+    bool wait;
 #endif
 
     /* Owned by thread.c. */

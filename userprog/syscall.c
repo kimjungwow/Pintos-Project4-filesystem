@@ -9,7 +9,7 @@
 #include "filesys/file.h"
 #include "filesys/filesys.h"
 
-/* Reads a byte at user virtual address UADDR.
+/*d Reads a byte at user virtual address UADDR.
    UADDR must be below PHYS_BASE.
    Returns the byte value if successful, -1 if a segfault
    occurred. */
@@ -36,15 +36,15 @@ put_user (uint8_t *udst, uint8_t byte)
 
 
 static void syscall_handler (struct intr_frame *);
-static struct semaphore handlesem;
+struct lock handlesem;
 bool already = false;
+bool jungwoo=false;
+
 void
 syscall_init (void)
 {
 
-	sema_init(&handlesem,1);
 	intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
-
 }
 
 static void
@@ -81,11 +81,19 @@ syscall_handler (struct intr_frame *f)
 
 		cmd_line = palloc_get_page (0);
 		if (cmd_line == NULL)
-			return TID_ERROR;
+			return -1;
 		strlcpy (cmd_line, *(char **)tempesp, PGSIZE);
-		struct file* openedfile = filesys_open(cmd_line);
 
-		f->eax = (int)process_execute(cmd_line);
+
+		lock_acquire(&handlesem);
+		struct file* openedfile = filesys_open(cmd_line);
+		lock_release(&handlesem);
+
+
+		int answer = (int)process_execute(cmd_line);
+
+		f->eax = answer;
+
 		break;
 	}
 
@@ -112,7 +120,9 @@ syscall_handler (struct intr_frame *f)
 
 		tempesp+=4;
 		pid_t pid = *(pid_t *)tempesp;
-		f->eax = process_wait((tid_t)pid);
+		// printf("pid : %d\n", pid);
+		int answer = process_wait((tid_t)pid);
+		f->eax = answer;
 		break;
 	}
 	case SYS_CREATE:
@@ -142,14 +152,15 @@ syscall_handler (struct intr_frame *f)
 
 			file = palloc_get_page (0);
 			if (file == NULL)
-				return TID_ERROR;
+				return -1;
 			strlcpy (file, *(char **)tempesp, PGSIZE);
 			tempesp+=4;
 			unsigned initial_size = *(unsigned *)tempesp;
 			if((strlen(file)<=14)&&(strlen(file)>0))
 			{
+				lock_acquire(&handlesem);
 				answer = filesys_create(file, initial_size);
-
+				lock_release(&handlesem);
 			}
 		}
 		f->eax=answer;
@@ -165,9 +176,12 @@ syscall_handler (struct intr_frame *f)
 
 		file = palloc_get_page (0);
 		if (file == NULL)
-			return TID_ERROR;
+			return -1;
 		strlcpy (file, *(char **)tempesp, PGSIZE);
+		lock_acquire(&handlesem);
 		bool answer = filesys_remove(file);
+		lock_release(&handlesem);
+
 		f->eax=answer;
 
 		break;
@@ -180,24 +194,32 @@ syscall_handler (struct intr_frame *f)
 		{
 			thread_current()->returnstatus=-1;
 			thread_exit();
+			f->eax=-1;
 		}
 
 		if((get_user(*(uint8_t **)tempesp)==-1)||(*tempesp==NULL))
 		{
 			thread_current()->returnstatus=-1;
 			thread_exit();
+			f->eax=-1;
 		}
 		char *file;
 
 		file = palloc_get_page (0);
 		if (file == NULL)
-			return TID_ERROR;
+			return -1;
 		strlcpy (file, *(char **)tempesp, PGSIZE);
+
+		lock_acquire(&handlesem);
 		struct file* openedfile = filesys_open(file);
+		lock_release(&handlesem);
+
 		int fd;
 		if (openedfile==NULL)
 		{
 			fd=-1;
+			palloc_free_page(file);
+			// f->eax=fd;
 		}
 		else
 		{
@@ -205,8 +227,11 @@ syscall_handler (struct intr_frame *f)
 			fd= thread_current()->nextfd;
 			thread_current()->fdtable[fd]=openedfile;
 			thread_current()->nextfd++;
+
 		}
 		f->eax=fd;
+
+
 
 		break;
 	}
@@ -216,9 +241,18 @@ syscall_handler (struct intr_frame *f)
 		tempesp+=4;
 		int fd = *(int *)tempesp;
 		struct file* filetoread = thread_current()->fdtable[fd];
-		sema_down(&handlesem);
-		int filesize = (int)(file_length(filetoread));
-		sema_up(&handlesem);
+
+		int filesize;
+		if (filetoread==NULL)
+			filesize = -1;
+		else
+		{
+
+			lock_acquire(&handlesem);
+			filesize = (int)(file_length(filetoread));
+			lock_release(&handlesem);
+		}
+
 		f->eax=filesize;
 		break;
 	}
@@ -247,6 +281,7 @@ syscall_handler (struct intr_frame *f)
 			thread_exit();
 		}
 		char *buffer;
+
 		buffer = *(char **)tempesp;
 		tempesp+=4;
 		unsigned size = *(unsigned *)tempesp;
@@ -271,23 +306,23 @@ syscall_handler (struct intr_frame *f)
 			else
 			{
 				struct file* filetoread = thread_current()->fdtable[fd];
-				if(get_user(*(uint8_t **)filetoread)==-1)
+				if (filetoread==NULL)
+					f->eax=-1;
+				else if(get_user(*(uint8_t **)filetoread)==-1)
 				{
 					f->eax=-1;
 				}
 				else
 				{
-					sema_down(&handlesem);
+					lock_acquire(&handlesem);
 					off_t readbytes = file_read(filetoread,(void *) buffer, (off_t)size);
-
-					f->eax=(int)readbytes;
-					sema_up(&handlesem);
-
-
-
+					lock_release(&handlesem);
+					f->eax=(uint32_t)readbytes;
 				}
+
 			}
 		}
+
 		break;
 	}
 	case SYS_WRITE:
@@ -308,6 +343,7 @@ syscall_handler (struct intr_frame *f)
 		unsigned size = *(unsigned *)tempesp, temp;
 		if(fd==1)
 		{
+
 			while(size>100)
 			{
 				putbuf(buffer,100);
@@ -315,6 +351,7 @@ syscall_handler (struct intr_frame *f)
 				size-=100;
 			}
 			putbuf(buffer,size);
+
 		}
 		else
 		{
@@ -338,10 +375,11 @@ syscall_handler (struct intr_frame *f)
 				thread_current()->returnstatus=-1;
 				thread_exit();
 			}
+
 			struct file* filetowrite = thread_current()->fdtable[fd];
-			sema_down(&handlesem);
+			lock_acquire(&handlesem);
 			off_t writebytes = file_write(filetowrite,(void *) buffer, (off_t)size);
-			sema_up(&handlesem);
+			lock_release(&handlesem);
 			f->eax=(int)writebytes;
 		}
 		break;
@@ -359,9 +397,9 @@ syscall_handler (struct intr_frame *f)
 			break;
 		else
 		{
-			sema_down(&handlesem);
+			lock_acquire(&handlesem);
 			file_seek(filetoseek,(off_t)position);
-			sema_up(&handlesem);
+			lock_release(&handlesem);
 			break;
 		}
 
@@ -377,7 +415,11 @@ syscall_handler (struct intr_frame *f)
 			break;
 		else
 		{
-			f->eax=(unsigned)file_tell(filetotell);
+			lock_acquire(&handlesem);
+			unsigned answertell=(unsigned)file_tell(filetotell);
+			lock_release(&handlesem);
+			f->eax = answertell;
+
 			break;
 		}
 	}
@@ -392,9 +434,9 @@ syscall_handler (struct intr_frame *f)
 		if(filetoclose!=NULL)
 		{
 			thread_current()->fdtable[fd]=NULL;
-			sema_down(&handlesem);
+			lock_acquire(&handlesem);
 			file_close(filetoclose);
-			sema_up(&handlesem);
+			lock_release(&handlesem);
 		}
 		else
 		{
