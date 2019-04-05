@@ -161,6 +161,7 @@ process_wait (tid_t child_tid)
 
 
 	child->wait=false;
+	barrier();
 	return exitstatus;
 }
 
@@ -239,7 +240,7 @@ process_exit (void)
 	}
 
 
-
+	barrier();
 
 }
 

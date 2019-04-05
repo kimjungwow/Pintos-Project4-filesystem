@@ -191,6 +191,7 @@ syscall_handler (struct intr_frame *f)
 			palloc_free_page(file);
 		}
 		f->eax=answer;
+		barrier();
 		break;
 	}
 	case SYS_REMOVE:
@@ -215,7 +216,7 @@ syscall_handler (struct intr_frame *f)
 
 		f->eax=answer;
 		palloc_free_page(file);
-
+		barrier();
 		break;
 	}
 	case SYS_OPEN:
@@ -242,15 +243,14 @@ syscall_handler (struct intr_frame *f)
 		{
 			f->eax=-1;
 			break;
-			// return -1;
 		}
 		strlcpy (file, *(char **)tempesp, PGSIZE);
 
 		lock_acquire(&handlesem);
 		struct file* openedfile = filesys_open(file);
 		lock_release(&handlesem);
-		filenum++;
 		palloc_free_page(file);
+		barrier();
 
 		int fd;
 		if (openedfile==NULL)
@@ -266,28 +266,18 @@ syscall_handler (struct intr_frame *f)
 			if(fd>=64)
 			{
 				fd=-1;
-
 				lock_acquire(&handlesem);
-
 				file_close(openedfile);
 				lock_release(&handlesem);
-				filenum--;
-				// palloc_free_page(file);
-
-
 			} else
 			{
-				// printf("%d WOO\n",fd);
 				thread_current()->fdtable[fd]=openedfile;
-
 				thread_current()->nextfd++;
 			}
 
 		}
 		f->eax=fd;
-
-
-
+		barrier();
 		break;
 	}
 	case SYS_FILESIZE:
@@ -296,7 +286,6 @@ syscall_handler (struct intr_frame *f)
 		tempesp+=4;
 		int fd = *(int *)tempesp;
 		struct file* filetoread = thread_current()->fdtable[fd];
-
 		int filesize;
 		if (filetoread==NULL)
 			filesize = -1;
@@ -309,6 +298,7 @@ syscall_handler (struct intr_frame *f)
 		}
 
 		f->eax=filesize;
+		barrier();
 		break;
 	}
 
@@ -335,7 +325,7 @@ syscall_handler (struct intr_frame *f)
 			thread_exit();
 		}
 
-		if((get_user(*(uint8_t **)tempesp)==-1)||(*tempesp==NULL)||(tempesp==NULL))
+		if((get_user(*(uint8_t **)tempesp)==-1)||(tempesp==NULL))
 		{
 			thread_current()->returnstatus=-1;
 			thread_exit();
@@ -374,14 +364,17 @@ syscall_handler (struct intr_frame *f)
 				}
 				else
 				{
+					barrier();
 					lock_acquire(&handlesem);
 					off_t readbytes = file_read(filetoread,(void *) buffer, (off_t)size);
 					lock_release(&handlesem);
 					f->eax=(uint32_t)readbytes;
+
 				}
 
 			}
 		}
+		barrier();
 
 		break;
 	}
@@ -409,6 +402,7 @@ syscall_handler (struct intr_frame *f)
 				putbuf(buffer,100);
 				buffer+=100;
 				size-=100;
+				barrier();
 			}
 			putbuf(buffer,size);
 
@@ -442,6 +436,7 @@ syscall_handler (struct intr_frame *f)
 			lock_release(&handlesem);
 			f->eax=(int)writebytes;
 		}
+		barrier();
 		break;
 	}
 	case SYS_SEEK:
@@ -509,6 +504,7 @@ syscall_handler (struct intr_frame *f)
 			thread_current()->returnstatus=-1;
 			thread_exit();
 		}
+		barrier();
 		break;
 	}
 	case SYS_MMAP:
