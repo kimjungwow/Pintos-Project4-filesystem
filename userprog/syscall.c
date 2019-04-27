@@ -101,12 +101,6 @@ syscall_handler (struct intr_frame *f)
 		}
 		strlcpy (cmd_line, *(char **)tempesp, PGSIZE);
 
-
-		// lock_acquire(&handlesem);
-		// struct file* openedfile = filesys_open(cmd_line);
-		// lock_release(&handlesem);
-
-
 		int answer = (int)process_execute(cmd_line);
 
 		f->eax = answer;
@@ -249,6 +243,7 @@ syscall_handler (struct intr_frame *f)
 		lock_acquire(&handlesem);
 		struct file* openedfile = filesys_open(file);
 		lock_release(&handlesem);
+		filenum++;
 		palloc_free_page(file);
 		barrier();
 
@@ -256,12 +251,12 @@ syscall_handler (struct intr_frame *f)
 		if (openedfile==NULL)
 		{
 			fd=-1;
+			filenum--;
 			// palloc_free_page(file);
-			// f->eax=fd;
+			// df->eax=fd;
 		}
 		else
 		{
-
 			fd= thread_current()->nextfd;
 			if(fd>=64)
 			{
@@ -269,10 +264,13 @@ syscall_handler (struct intr_frame *f)
 				lock_acquire(&handlesem);
 				file_close(openedfile);
 				lock_release(&handlesem);
+				filenum--;
+
 			} else
 			{
 				thread_current()->fdtable[fd]=openedfile;
 				thread_current()->nextfd++;
+				// printf("OPEN SYS_OPEN %p address | FILES %d\n",openedfile,filenum);
 			}
 
 		}
@@ -498,12 +496,14 @@ syscall_handler (struct intr_frame *f)
 			file_close(filetoclose);
 			lock_release(&handlesem);
 			filenum--;
+			// printf("CLOSE SIBALSIBAL %p address | FILES %d\n",filetoclose,filenum);
 		}
 		else
 		{
 			thread_current()->returnstatus=-1;
 			thread_exit();
 		}
+
 		barrier();
 		break;
 	}

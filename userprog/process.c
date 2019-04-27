@@ -219,27 +219,31 @@ process_exit (void)
 	}
 
 	int j;
-	for (j=2;j<64;j++)
+	for (j=0;j<64;j++)
 	{
 		struct file* ftoclose = curr->fdtable[j];
 		if (ftoclose!=NULL)
 		{
+
 			lock_acquire(&handlesem);
 			file_close (ftoclose);
 			lock_release(&handlesem);
 			filenum--;
+			// printf("CLOSE 1 | %p address | FILES %d\n",ftoclose,filenum);
 		}
 	}
 	if(curr->file!=NULL)
 	{
+
 		lock_acquire(&handlesem);
 		file_close (curr->file);
 		lock_release(&handlesem);
 		filenum--;
+		// printf("CLOSE 2 | %p address | FILES %d\n",curr->file,filenum);
 		curr->file=NULL;
 	}
 
-
+	// printf("WWW %d \n",filenum);
 	barrier();
 
 }
@@ -365,12 +369,16 @@ load (const char *file_name, void (**eip) (void), void **esp)
 	lock_release(&handlesem);
 	filenum++;
 
+
 	if (file == NULL)
 	{
+		filenum--;
 
 		printf ("load: %s: open failed\n", file_name);
 		goto done;
 	}
+
+	// printf("OPEN in load %p address | FILES %d\n",file,filenum);
 	file_deny_write(file);
 	t->file=file;
 
@@ -464,7 +472,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
 done:
 	/* We arrive here whether the load is successful or not. */
 	palloc_free_page(fn_copy);
-	// file_close(file);
 	return success;
 }
 
@@ -548,7 +555,10 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
 		/* Get a page of memory. */
-		uint8_t *kpage = palloc_get_page (PAL_USER);
+
+		uint8_t *kpage = get_frame();
+		// uint8_t *kpage = palloc_get_page (PAL_USER);
+
 		if (kpage == NULL)
 			return false;
 
@@ -591,7 +601,8 @@ setup_stack (void **esp, char* file_name)
 		return TID_ERROR;
 	strlcpy (fn_copy, file_name, PGSIZE);
 
-	kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+	//kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+	kpage = get_frame_zero();
 	if (kpage != NULL)
 	{
 		success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
