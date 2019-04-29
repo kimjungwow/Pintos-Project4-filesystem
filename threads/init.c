@@ -91,7 +91,7 @@ main (void)
 
 
   frame_init ();
-  page_init ();
+  //page_init ();
 
 
   /* Segmentation. */

@@ -18,6 +18,7 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "syscall.h"
+#include "vm/page.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -97,7 +98,6 @@ start_process (void *f_name)
 	sema_up(&thread_current()->loadsem);
 	sema_down(&thread_current()->loadsuccesssem);
 
-	// palloc_free_page (file_name);
 	palloc_free_page(f_name);
 	if (!success)
 	{
@@ -131,16 +131,12 @@ start_process (void *f_name)
 int
 process_wait (tid_t child_tid)
 {
-	// printf("WWW %d \n",filenum);
-	// timer_sleep((int64_t)100);
 	struct thread* child = find_child(child_tid);
 	if(child==NULL)
 	{
 		return -1;
 	}
 	sema_down(&child->waitsem);
-
-	// printf("child name : %s\n", child->name);
 
 	if(child->wait)
 	{
@@ -155,9 +151,7 @@ process_wait (tid_t child_tid)
 		lock_release(&handlesem);
 	}
 	sema_up(&child->diesem);
-	// printf("ABOVE JIN\n");
 	sema_down(&child->jinsem);
-	// printf("BELOW JIN\n");
 
 
 	child->wait=false;
@@ -239,11 +233,9 @@ process_exit (void)
 		file_close (curr->file);
 		lock_release(&handlesem);
 		filenum--;
-		// printf("CLOSE 2 | %p address | FILES %d\n",curr->file,filenum);
 		curr->file=NULL;
 	}
 
-	// printf("WWW %d \n",filenum);
 	barrier();
 
 }
@@ -382,8 +374,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
 	file_deny_write(file);
 	t->file=file;
 
-
-
 	/* Read and verify executable header. */
 	if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
 	    || memcmp (ehdr.e_ident, "\177ELF\1\1\1", 7)
@@ -448,8 +438,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
 					read_bytes = 0;
 					zero_bytes = ROUND_UP (page_offset + phdr.p_memsz, PGSIZE);
 				}
-				if (!load_segment (file, file_page, (void *) mem_page,
-				                   read_bytes, zero_bytes, writable))
+				/*if (filerelated_page(file,file_page,(void *)mem_page,
+															read_bytes,zero_bytes,writable)==NULL)*/
+			   if (!load_segment (file, file_page, (void *) mem_page,
+			 	  								  read_bytes, zero_bytes, writable))
 					goto done;
 			}
 			else
@@ -536,6 +528,7 @@ validate_segment (const struct Elf32_Phdr *phdr, struct file *file)
    The pages initialized by this function must be writable by the
    user process if WRITABLE is true, read-only otherwise.
    Return true if successful, false if a memory allocation error
+
    or disk read error occurs. */
 static bool
 load_segment (struct file *file, off_t ofs, uint8_t *upage,
@@ -556,7 +549,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
 		/* Get a page of memory. */
 
-		uint8_t *kpage = get_frame();
+		uint8_t *kpage = allocate_frame(upage,PAL_USER);
+
 		// uint8_t *kpage = palloc_get_page (PAL_USER);
 
 		if (kpage == NULL)
@@ -602,11 +596,13 @@ setup_stack (void **esp, char* file_name)
 	strlcpy (fn_copy, file_name, PGSIZE);
 
 	//kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-	kpage = get_frame_zero();
+	kpage = allocate_frame (((uint8_t *) PHYS_BASE) - PGSIZE,PAL_USER | PAL_ZERO);
 	if (kpage != NULL)
 	{
 		success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-		if (success)
+		/*struct sup_page_table_entry * getspte = allocate_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+		if (getspte!=NULL)
+		*/ if (success)
 		{
 			*esp = PHYS_BASE;
 			uint8_t *jinesp = (uint8_t *)*esp;

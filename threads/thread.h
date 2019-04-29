@@ -5,6 +5,8 @@
 #include <list.h>
 #include <stdint.h>
 #include "synch.h"
+#include "lib/kernel/hash.h"
+#include "vm/page.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -90,7 +92,6 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
 
-
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
@@ -113,22 +114,15 @@ struct thread
     bool loadsuccess;
     struct file* file;
     bool wait;
+
+
 #endif
+  struct hash hash;
+  struct sup_page_table_entry** suppagetable;
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
-
-// struct syscall_thread
-// {
-//   tid_t tid;
-//   int answer;
-//   struct list_elem sys_elem;
-//   struct semaphore waitsem;
-//   struct semaphore loadsem;
-//
-//
-// };
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.

@@ -209,7 +209,9 @@ thread_create (const char *name, int priority,
   #ifdef USERPROG
     list_push_back(&thread_current()->childrenlist, &t->child_elem);
     t->wait=false;
+
   #endif
+  page_init ();
 
   /* Add to run queue. */
   thread_unblock (t);
