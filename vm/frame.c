@@ -22,32 +22,6 @@ frame_init (void)
   return;
 }
 /*
-void*
-get_frame(void)
-{
-  uint8_t *upage = palloc_get_page (PAL_USER);
-  if (allocate_frame((void *)upage))
-    return (void *)upage;
-  else
-  {
-    PANIC("FRAME_TABLE_RUNOUT");
-    return NULL;
-  }
-}
-
-void* get_frame_zero(void)
-{
-  uint8_t *upage = palloc_get_page (PAL_USER|PAL_ZERO);
-  if (allocate_frame((void *)upage))
-    return (void *)upage;
-  else
-    {
-      PANIC("FRAME_TABLE_RUNOUT");
-      return NULL;
-    }
-}*/
-
-/*
  * Make a new frame table entry for addr.
  */
 void *
@@ -59,12 +33,34 @@ allocate_frame (void *uaddr, enum palloc_flags flags)
   {
     if(frametable[i]->owner==NULL)
     {
-      struct hash_elem elem;
+      // struct hash_elem elem;
       frametable[i]->frame = frame;
       frametable[i]->owner = thread_current();
       frametable[i]->uaddr = (uint32_t*)uaddr;
-      frametable[i]->hash_elem = elem;
-      return frame;
+      // frametable[i]->hash_elem = elem;
+      hash_insert(&ftehash,&frametable[i]->hash_elem);
+      uint32_t* fault_addr = pg_round_down(uaddr);
+      struct sup_page_table_entry check;
+      struct hash_elem *he;
+      struct sup_page_table_entry* spte;
+      check.user_vaddr=fault_addr;
+      he= hash_find(&thread_current()->hash, &check.hash_elem);
+      spte = he !=NULL ? hash_entry(he, struct sup_page_table_entry, hash_elem) : NULL;
+      if(spte!=NULL)
+      {
+        frametable[i]->spte=spte;
+        if(pagedir_get_page (thread_current()->pagedir, uaddr) == NULL)
+        {
+          pagedir_set_page (thread_current()->pagedir, uaddr, frame, spte->writable);
+          return frame;
+        }
+        // printf("FAIL TO INSTALL_PAGE\n");
+        return frame;
+      }
+      else{
+        // printf("FAIL TO FIND SPTE\n");
+        return frame;
+      }
     }
   }
   palloc_free_page(frame);
@@ -72,7 +68,7 @@ allocate_frame (void *uaddr, enum palloc_flags flags)
   return NULL;
 
 }
-//
+
 
 
 unsigned

@@ -8,5 +8,6 @@
 
 void exception_init (void);
 void exception_print_stats (void);
+//static bool install_page (void *upage, void *kpage, bool writable);
 
 #endif /* userprog/exception.h */

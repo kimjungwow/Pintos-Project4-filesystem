@@ -211,7 +211,7 @@ thread_create (const char *name, int priority,
     t->wait=false;
 
   #endif
-  page_init ();
+
 
   /* Add to run queue. */
   thread_unblock (t);
@@ -457,6 +457,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
+
   #ifdef USERPROG
     list_init(&t->childrenlist);
     sema_init(&t->diesem,0);

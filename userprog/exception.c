@@ -4,6 +4,11 @@
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "vm/frame.h"
+#include "vm/page.h"
+#include "filesys/directory.h"
+#include "filesys/file.h"
+#include "filesys/filesys.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -157,6 +162,88 @@ page_fault (struct intr_frame *f)
     f->eax =0xffffffff;
     return;
   }
+  else
+  {
+    if((fault_addr==NULL)||(is_kernel_vaddr(fault_addr)))
+      thread_exit();
+    fault_addr = pg_round_down(fault_addr);
+
+    struct sup_page_table_entry check;
+    struct hash_elem *he;
+    struct sup_page_table_entry* spte;
+    check.user_vaddr=(uint32_t *)fault_addr;
+    he= hash_find(&thread_current()->hash, &check.hash_elem);
+    spte = he !=NULL ? hash_entry(he, struct sup_page_table_entry, hash_elem) : NULL;
+    if(spte==NULL)
+    {
+      return;
+      PANIC("INVALID - Not in SPT");
+    }
+    else
+    {
+      if(spte->file==NULL)
+      {
+
+      PANIC("NOT FILE CASE");
+      return;
+      }
+      else
+      {
+        ASSERT ((spte->read_bytes + spte->zero_bytes) % PGSIZE == 0);
+      	ASSERT (pg_ofs (spte->user_vaddr) == 0);
+      	ASSERT (spte->ofs % PGSIZE == 0);
+
+      	file_seek (spte->file, spte->ofs);
+      	while (spte->read_bytes > 0 || spte->zero_bytes > 0)
+      	{
+      		/* Do calculate how to fill this page.
+      		   We will read PAGE_READ_BYTES bytes from FILE
+      		   and zero the final PAGE_ZERO_BYTES bytes. */
+      		size_t page_read_bytes = spte->read_bytes < PGSIZE ? spte->read_bytes : PGSIZE;
+      		size_t page_zero_bytes = PGSIZE - page_read_bytes;
+
+      		/* Get a page of memory. */
+
+      		uint8_t *kpage = allocate_frame (spte->user_vaddr, PAL_USER);
+      		// uint8_t *kpage = palloc_get_page (PAL_USER);
+
+      		if (kpage == NULL)
+      			return;
+
+      		/* Load this page. */
+      		if (file_read (spte->file, kpage, page_read_bytes) != (int) page_read_bytes)
+      		{
+      			palloc_free_page (kpage);
+      			return;
+      		}
+      		memset (kpage + page_read_bytes, 0, page_zero_bytes);
+
+      		/* Add the page to the process's address space. */
+//      		if (!install_page (spte->user_vaddr, kpage, spte->writable))
+          /*if(!(pagedir_get_page (thread_current()->pagedir, spte->user_vaddr) == NULL
+          	        && pagedir_set_page (thread_current()->pagedir, spte->user_vaddr, kpage, spte->writable)))
+      		{
+      			palloc_free_page (kpage);
+      			return;
+      		}*/
+
+      		/* Advance. */
+      		spte->read_bytes -= page_read_bytes;
+      		spte->zero_bytes -= page_zero_bytes;
+          printf("%p BEFORE + PGSIZE\n",spte->user_vaddr);
+      		spte->user_vaddr += PGSIZE;
+          printf("%p AFTER + PGSIZE\n",spte->user_vaddr);
+          printf("WHERE %p\n",pg_round_down(spte->user_vaddr-PGSIZE/4));
+      	}
+      	// return true;
+        return;
+      }
+    }
+
+
+    return;
+  }
+
   thread_current()->returnstatus=-1;
   thread_exit();
   /* To implement virtual memory, delete the rest of the function
@@ -170,3 +257,15 @@ page_fault (struct intr_frame *f)
   kill (f);
 
 }
+/*
+static bool
+install_page (void *upage, void *kpage, bool writable)
+{
+	struct thread *t = thread_current ();
+
+	// Verify that there's not already a page at that virtual
+	  // address, then map our page there.
+	return (pagedir_get_page (t->pagedir, upage) == NULL
+	        && pagedir_set_page (t->pagedir, upage, kpage, writable));
+}
+*/

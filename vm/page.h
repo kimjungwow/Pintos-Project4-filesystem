@@ -21,7 +21,6 @@
 struct sup_page_table_entry
 {
 	uint32_t* user_vaddr;
-	//uint32_t* kernel_vaddr;
 	uint64_t access_time;
 	struct hash_elem hash_elem;
 
@@ -43,8 +42,4 @@ allocate_page (struct file *file, off_t ofs, uint8_t *upage,
 							unsigned
 							hash_spte(struct hash_elem he);
 bool compare_spte(struct hash_elem a, struct hash_elem b);
-/*struct sup_page_table_entry*
-filerelated_page (struct file *file, off_t ofs, uint8_t *upage,
-              uint32_t read_bytes, uint32_t zero_bytes, bool writable);
-*/
 #endif /* vm/page.h */
