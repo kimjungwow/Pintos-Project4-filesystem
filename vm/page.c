@@ -52,21 +52,7 @@ allocate_page (struct file *file, off_t ofs, uint8_t *upage,
         myspte->filerelated = false;
       }
       myspte->writable=writable;
-      size_t frametableindex=user_pool.used_map->bit_cnt;
-      // memcpy(thread_current()->suppagetable[i],myspte,sizeof (struct sup_page_table_entry));
-      if(upage!=NULL)
-      {
-        struct frame_table_entry fte;
-        struct hash_elem* e;
-        fte.uaddr=upage;
-        e=hash_find(&ftehash,&fte.hash_elem);
-        if(e!=NULL)
-        {
-          struct frame_table_entry* goalfte= hash_entry(e, struct frame_table_entry,hash_elem);
-          goalfte->spte=myspte;
-        }
 
-      }
       return myspte;
     }
   }

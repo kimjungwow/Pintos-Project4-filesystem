@@ -8,6 +8,7 @@
 
 void exception_init (void);
 void exception_print_stats (void);
+extern struct lock handlesem;
 //static bool install_page (void *upage, void *kpage, bool writable);
 
 #endif /* userprog/exception.h */

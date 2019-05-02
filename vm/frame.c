@@ -2,9 +2,10 @@
 
 extern struct pool user_pool;
 
-struct frame_table_entry** frametable;
+// struct frame_table_entry** frametable;
 size_t frametableindex;
-struct lock frametablelock;
+// struct lock handlesem;
+struct lock handlesem;
 /*
  * Initialize frame table
  */
@@ -12,15 +13,8 @@ void
 frame_init (void)
 {
   frametableindex=user_pool.used_map->bit_cnt;
-  frametable = (struct frame_table_entry**)malloc(sizeof(struct frame_table_entry) *frametableindex);
-  size_t i;
-  for(i=0;i<frametableindex;i++)
-  {
-    frametable[i] = malloc(sizeof(struct frame_table_entry));
-    memset(frametable[i],0,sizeof(struct frame_table_entry));
-  }
   hash_init(&ftehash,hash_fte,compare_fte,NULL);
-  lock_init(&frametablelock);
+  lock_init(&handlesem);
   return;
 }
 /*
@@ -29,57 +23,49 @@ frame_init (void)
 void *
 allocate_frame (void *uaddr, enum palloc_flags flags)
 {
-  lock_acquire(&frametablelock);
+  lock_acquire(&handlesem);
 
   uint32_t *frame = palloc_get_page(flags);
   size_t i;
-  for(i=0;i<frametableindex;i++)
+  struct frame_table_entry* newfte = (struct frame_table_entry*)malloc(sizeof(struct frame_table_entry));
+  newfte->frame = frame;
+  newfte->owner = thread_current();
+  newfte->uaddr = (uint32_t*)uaddr;
+
+  hash_insert(&ftehash,&newfte->hash_elem);
+  uint32_t* fault_addr = pg_round_down(uaddr);
+  struct sup_page_table_entry check;
+  struct hash_elem *he;
+  struct sup_page_table_entry* spte;
+  check.user_vaddr=fault_addr;
+  he= hash_find(&thread_current()->hash, &check.hash_elem);
+  spte = he !=NULL ? hash_entry(he, struct sup_page_table_entry, hash_elem) : NULL;
+  if(spte!=NULL)
   {
-    if(frametable[i]->owner==NULL)
+    newfte->spte=spte;
+    if(pagedir_get_page (thread_current()->pagedir, uaddr) == NULL)
     {
-      // struct hash_elem elem;
-      frametable[i]->frame = frame;
-      frametable[i]->owner = thread_current();
-      frametable[i]->uaddr = (uint32_t*)uaddr;
-      // frametable[i]->hash_elem = elem;
-      barrier();
-      hash_insert(&ftehash,&frametable[i]->hash_elem);
-      barrier();
-      uint32_t* fault_addr = pg_round_down(uaddr);
-      struct sup_page_table_entry check;
-      struct hash_elem *he;
-      struct sup_page_table_entry* spte;
-      check.user_vaddr=fault_addr;
-      he= hash_find(&thread_current()->hash, &check.hash_elem);
-      spte = he !=NULL ? hash_entry(he, struct sup_page_table_entry, hash_elem) : NULL;
-      if(spte!=NULL)
-      {
-        frametable[i]->spte=spte;
-        if(pagedir_get_page (thread_current()->pagedir, uaddr) == NULL)
-        {
 
-          pagedir_set_page (thread_current()->pagedir, uaddr, frame, spte->writable);
-          lock_release(&frametablelock);
-          return frame;
-        }
-        printf("NOT REACHED\n");
-        palloc_free_page(frame);
-        lock_release(&frametablelock);
-
-        return NULL;
-      }
-      else{
-        printf("FAIL TO FIND SPTE\n");
-        palloc_free_page(frame);
-        lock_release(&frametablelock);
-        return NULL;
-      }
+      pagedir_set_page (thread_current()->pagedir, uaddr, frame, spte->writable);
+      lock_release(&handlesem);
+      return frame;
     }
+    printf("NOT REACHED\n");
+    palloc_free_page(frame);
+    lock_release(&handlesem);
+
+    return NULL;
   }
-  //palloc_free_page(frame);
+  else{
+    printf("FAIL TO FIND SPTE\n");
+    palloc_free_page(frame);
+    lock_release(&handlesem);
+    return NULL;
+  }
+
   printf("RUN OUT OF FRAME\n");
   palloc_free_page(frame);
-  lock_release(&frametablelock);
+  lock_release(&handlesem);
   return NULL;
 
 }

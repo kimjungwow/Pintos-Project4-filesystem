@@ -113,7 +113,6 @@ start_process (void *f_name)
 	   and jump to it. */
 
 	thread_current()->nextfd=2;
-
 	asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (&if_) : "memory");
 	NOT_REACHED ();
 }
@@ -450,10 +449,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
 					read_bytes = 0;
 					zero_bytes = ROUND_UP (page_offset + phdr.p_memsz, PGSIZE);
 				}
-				if(allocate_page(file, file_page, (void *) mem_page,
-				                  read_bytes, zero_bytes, writable)==NULL)
-				// if (!load_segment (file, file_page, (void *) mem_page,
-				//                   read_bytes, zero_bytes, writable))
+				// if(allocate_page(file, file_page, (void *) mem_page,
+				//                   read_bytes, zero_bytes, writable)==NULL)
+				if (!load_segment (file, file_page, (void *) mem_page,
+				                  read_bytes, zero_bytes, writable))
 					goto done;
 			}
 			else
@@ -567,27 +566,31 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		/* Get a page of memory. */
 
 		// uint8_t *kpage = allocate_frame (upage, PAL_USER);
-		uint8_t *kpage = palloc_get_page (PAL_USER);
+		// uint8_t *kpage = palloc_get_page (PAL_USER);
 
-		if (kpage == NULL)
-			return false;
+		// if (kpage == NULL)
+		// 	return false;
 
 		/* Load this page. */
-		if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
-		{
-			palloc_free_page (kpage);
-			return false;
-		}
-		memset (kpage + page_read_bytes, 0, page_zero_bytes);
+		// if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
+		// {
+		// 	palloc_free_page (kpage);
+		// 	return false;
+		// }
+		// memset (kpage + page_read_bytes, 0, page_zero_bytes);
 
 		/* Add the page to the process's address space. */
-		if (!install_page (upage, kpage, writable))
-		{
-			palloc_free_page (kpage);
-			return false;
-		}
+		// if (!install_page (upage, kpage, writable))
+		// {
+		// 	palloc_free_page (kpage);
+		// 	return false;
+		// }
+
+
 
 		/* Advance. */
+		allocate_page(file, ofs, upage, read_bytes, zero_bytes, writable);
+		ofs += page_read_bytes;
 		read_bytes -= page_read_bytes;
 		zero_bytes -= page_zero_bytes;
 		upage += PGSIZE;
@@ -601,7 +604,7 @@ static bool
 setup_stack (void **esp, char* file_name)
 {
 	uint8_t *kpage;
-	
+
 	bool success = false;
 	char *fn_copy;
 

@@ -15,7 +15,7 @@
 #include "threads/thread.h"
 
 struct hash ftehash;
-
+extern struct lock handlesem;
 
 #ifndef VM_FRAME_H
 #define VM_FRAME_H

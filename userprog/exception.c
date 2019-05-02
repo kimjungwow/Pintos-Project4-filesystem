@@ -15,6 +15,7 @@ static long long page_fault_cnt;
 
 static void kill (struct intr_frame *);
 static void page_fault (struct intr_frame *);
+struct lock handlesem;
 
 /* Registers handlers for interrupts that can be caused by user
    programs.
@@ -166,33 +167,44 @@ page_fault (struct intr_frame *f)
   else
   {
     if((fault_addr==NULL)||(is_kernel_vaddr(fault_addr)))
+    {
+      thread_current()->returnstatus=-1;
       thread_exit();
-    void* currentesp = f->esp;
-    if(currentesp-fault_addr==-8)
-      {
+    }
 
-        // printf("%x = Maybe access to stack. %p = currentesp  | %p = fault_addr\n",currentesp-fault_addr,currentesp,fault_addr);
-        struct sup_page_table_entry* stackgrow = allocate_page(NULL,0,pg_round_down(fault_addr),0,0,true);
-        uint8_t *kpage;
-      	kpage =	allocate_frame (pg_round_down(fault_addr), PAL_USER | PAL_ZERO);
-        return;
 
-      }
-    fault_addr = pg_round_down(fault_addr);
+    // fault_addr = pg_round_down(fault_addr);
 
     struct sup_page_table_entry check;
     struct hash_elem *he;
     struct sup_page_table_entry* spte;
-    check.user_vaddr=(uint32_t *)fault_addr;
-    barrier();
-    he= hash_find(&thread_current()->hash, &check.hash_elem);
+    check.user_vaddr=(uint32_t *)(pg_round_down(fault_addr));
+    he = hash_find(&thread_current()->hash, &check.hash_elem);
 
     spte = he !=NULL ? hash_entry(he, struct sup_page_table_entry, hash_elem) : NULL;
     // printf("%p = he | %p = spte\n",he,spte);
     if(spte==NULL)
     {
-      return;
-      PANIC("INVALID - Not in SPT");
+      void* currentesp = f->esp;
+      // printf("%d=bool |%u = Maybe access to stack. %p = currentesp  | %p = fault_addr\n",currentesp<=fault_addr,currentesp-fault_addr,currentesp,fault_addr);
+      if((currentesp<=fault_addr)||(currentesp-fault_addr==32)||(currentesp-fault_addr==4))
+            // if(((unsigned int*)currentesp-(unsigned int*)fault_addr<=0)||(currentesp-fault_addr==32)||(currentesp-fault_addr==4))
+      {
+
+
+        struct sup_page_table_entry* stackgrow = allocate_page(NULL,0,pg_round_down(fault_addr),0,0,true);
+        uint8_t *kpage;
+        kpage =	allocate_frame (pg_round_down(fault_addr), PAL_USER | PAL_ZERO);
+        return;
+
+      }
+      else
+      {
+        thread_current()->returnstatus=-1;
+        thread_exit();
+        return;
+        PANIC("INVALID - Not in SPT");
+      }
     }
     else
     {
@@ -207,59 +219,38 @@ page_fault (struct intr_frame *f)
         // printf("%p = spte->user_vaddr | %p = fault_addr\n",spte->user_vaddr,fault_addr);
         ASSERT ((spte->read_bytes + spte->zero_bytes) % PGSIZE == 0);
       	ASSERT (pg_ofs (spte->user_vaddr) == 0);
-      	ASSERT (spte->ofs % PGSIZE == 0);
-
+      	// ASSERT (spte->ofs % PGSIZE == 0);
+        lock_acquire(&handlesem);
       	file_seek (spte->file, spte->ofs);
-      	while (spte->read_bytes > 0 || spte->zero_bytes > 0)
-      	{
-      		/* Do calculate how to fill this page.
-      		   We will read PAGE_READ_BYTES bytes from FILE
-      		   and zero the final PAGE_ZERO_BYTES bytes. */
-      		size_t page_read_bytes = spte->read_bytes < PGSIZE ? spte->read_bytes : PGSIZE;
-      		size_t page_zero_bytes = PGSIZE - page_read_bytes;
+        lock_release(&handlesem);
 
-      		/* Get a page of memory. */
+    		/* Do calculate how to fill this page.
+    		   We will read PAGE_READ_BYTES bytes from FILE
+    		   and zero the final PAGE_ZERO_BYTES bytes. */
+    		size_t page_read_bytes = spte->read_bytes;
+    		size_t page_zero_bytes = spte->zero_bytes;
 
-      		uint8_t *kpage = allocate_frame (spte->user_vaddr, PAL_USER);
-      		// uint8_t *kpage = palloc_get_page (PAL_USER);
+    		/* Get a page of memory. */
 
-      		if (kpage == NULL)
-      			return;
-          barrier();
-      		/* Load this page. */
-      		if (file_read (spte->file, kpage, page_read_bytes) != (int) page_read_bytes)
-      		{
-      			palloc_free_page (kpage);
-      			return;
-      		}
-      		memset (kpage + page_read_bytes, 0, page_zero_bytes);
-          barrier();
-      		/* Add the page to the process's address space. */
-//      		if (!install_page (spte->user_vaddr, kpage, spte->writable))
-          /*if(pagedir_get_page (thread_current()->pagedir, spte->user_vaddr) == NULL)
-          {
-            pagedir_set_page (thread_current()->pagedir, spte->user_vaddr, kpage, spte->writable);
-          }
-          else
-      		{
-      			palloc_free_page (kpage);
-      			return;
-      		}*/
+    		uint8_t *kpage = allocate_frame (spte->user_vaddr, PAL_USER);
+    		// uint8_t *kpage = palloc_get_page (PAL_USER);
 
-      		/* Advance. */
-      		spte->read_bytes -= page_read_bytes;
-      		spte->zero_bytes -= page_zero_bytes;
-          // printf("%p BEFORE + PGSIZE\n",spte->user_vaddr);
-      		spte->user_vaddr += PGSIZE/4;
-          // printf("%p AFTER + PGSIZE\n",spte->user_vaddr);
-          // printf("WHERE %p\n",pg_round_down(spte->user_vaddr-PGSIZE/4));
-      	}
-      	// return true;
+    		if (kpage == NULL)
+    			return;
+
+    		/* Load this page. */
+        lock_acquire(&handlesem);
+    		if (file_read (spte->file, kpage, page_read_bytes) != (int) page_read_bytes)
+    		{
+    			palloc_free_page (kpage);
+          lock_release(&handlesem);
+    			return;
+    		}
+    		memset (kpage + page_read_bytes, 0, page_zero_bytes);
+        lock_release(&handlesem);
         return;
       }
     }
-
-
     return;
   }
 
@@ -276,15 +267,3 @@ page_fault (struct intr_frame *f)
   kill (f);
 
 }
-/*
-static bool
-install_page (void *upage, void *kpage, bool writable)
-{
-	struct thread *t = thread_current ();
-
-	// Verify that there's not already a page at that virtual
-	  // address, then map our page there.
-	return (pagedir_get_page (t->pagedir, upage) == NULL
-	        && pagedir_set_page (t->pagedir, upage, kpage, writable));
-}
-*/
