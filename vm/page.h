@@ -38,8 +38,7 @@ void page_init (void);
 //struct sup_page_table_entry *allocate_page (void *uaddr, void *kaddr, bool writable);
 struct sup_page_table_entry *
 allocate_page (struct file *file, off_t ofs, uint8_t *upage,
-              uint32_t read_bytes, uint32_t zero_bytes, bool writable);
-							unsigned
-							hash_spte(struct hash_elem he);
-bool compare_spte(struct hash_elem a, struct hash_elem b);
+uint32_t read_bytes, uint32_t zero_bytes, bool writable);
+unsigned hash_spte(const struct hash_elem* he, void* aux UNUSED);
+bool compare_spte(const struct hash_elem* a,const struct hash_elem* b,void* aux UNUSED);
 #endif /* vm/page.h */

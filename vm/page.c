@@ -35,10 +35,10 @@ allocate_page (struct file *file, off_t ofs, uint8_t *upage,
     struct sup_page_table_entry* myspte = given+i*(sizeof (struct sup_page_table_entry))/(sizeof(struct sup_page_table_entry*));
     if(myspte->user_vaddr==NULL)
     {
-      struct hash_elem hash_elem;
+
       myspte->user_vaddr=(uint32_t *)upage;
       myspte->access_time=(uint64_t)timer_ticks();
-      myspte->hash_elem = hash_elem;
+      hash_insert(&thread_current()->hash,&myspte->hash_elem);
       if(file!=NULL)
       {
         myspte->filerelated = true;
@@ -77,16 +77,16 @@ allocate_page (struct file *file, off_t ofs, uint8_t *upage,
 
 
 unsigned
-hash_spte(struct hash_elem he)
+hash_spte(const struct hash_elem* he,void *aux UNUSED)
 {
-  struct sup_page_table_entry* spte = hash_entry(&he,struct sup_page_table_entry, hash_elem);
-  return hash_bytes(spte->user_vaddr, sizeof spte->user_vaddr);
+  const struct sup_page_table_entry* spte = hash_entry(he,struct sup_page_table_entry, hash_elem);
+  return hash_bytes(&spte->user_vaddr, sizeof spte->user_vaddr);
 }
 
 bool
-compare_spte(struct hash_elem a, struct hash_elem b)
+compare_spte(const struct hash_elem *a, const struct hash_elem *b, void *aux UNUSED)
 {
-  const struct sup_page_table_entry* afte = hash_entry(&a, struct sup_page_table_entry, hash_elem);
-  const struct sup_page_table_entry* bfte = hash_entry(&b, struct sup_page_table_entry, hash_elem);
-  return afte->user_vaddr < bfte->user_vaddr ;
+  const struct sup_page_table_entry* afte = hash_entry(a, struct sup_page_table_entry, hash_elem);
+  const struct sup_page_table_entry* bfte = hash_entry(b, struct sup_page_table_entry, hash_elem);
+  return afte->user_vaddr < bfte->user_vaddr;
 }

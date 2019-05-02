@@ -54,17 +54,21 @@ allocate_frame (void *uaddr, enum palloc_flags flags)
           pagedir_set_page (thread_current()->pagedir, uaddr, frame, spte->writable);
           return frame;
         }
-        // printf("FAIL TO INSTALL_PAGE\n");
-        return frame;
+        printf("NOT REACHED\n");
+        palloc_free_page(frame);
+
+        return NULL;
       }
       else{
-        // printf("FAIL TO FIND SPTE\n");
-        return frame;
+        printf("FAIL TO FIND SPTE\n");
+        palloc_free_page(frame);
+        return NULL;
       }
     }
   }
+  //palloc_free_page(frame);
+  printf("RUN OUT OF FRAME\n");
   palloc_free_page(frame);
-  PANIC("RUN OUT OF FRAME");
   return NULL;
 
 }

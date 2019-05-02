@@ -220,8 +220,11 @@ page_fault (struct intr_frame *f)
 
       		/* Add the page to the process's address space. */
 //      		if (!install_page (spte->user_vaddr, kpage, spte->writable))
-          /*if(!(pagedir_get_page (thread_current()->pagedir, spte->user_vaddr) == NULL
-          	        && pagedir_set_page (thread_current()->pagedir, spte->user_vaddr, kpage, spte->writable)))
+          /*if(pagedir_get_page (thread_current()->pagedir, spte->user_vaddr) == NULL)
+          {
+            pagedir_set_page (thread_current()->pagedir, spte->user_vaddr, kpage, spte->writable);
+          }
+          else
       		{
       			palloc_free_page (kpage);
       			return;
@@ -230,10 +233,10 @@ page_fault (struct intr_frame *f)
       		/* Advance. */
       		spte->read_bytes -= page_read_bytes;
       		spte->zero_bytes -= page_zero_bytes;
-          printf("%p BEFORE + PGSIZE\n",spte->user_vaddr);
-      		spte->user_vaddr += PGSIZE;
-          printf("%p AFTER + PGSIZE\n",spte->user_vaddr);
-          printf("WHERE %p\n",pg_round_down(spte->user_vaddr-PGSIZE/4));
+          // printf("%p BEFORE + PGSIZE\n",spte->user_vaddr);
+      		spte->user_vaddr += PGSIZE/4;
+          // printf("%p AFTER + PGSIZE\n",spte->user_vaddr);
+          // printf("WHERE %p\n",pg_round_down(spte->user_vaddr-PGSIZE/4));
       	}
       	// return true;
         return;

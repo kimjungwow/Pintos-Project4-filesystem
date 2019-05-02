@@ -195,6 +195,8 @@ process_exit (void)
 		   directory before destroying the process's page
 		   directory, or our active page directory will be one
 		   that's been freed (and cleared). */
+		if((curr->suppagetable!=NULL)&&(curr->suppagetable!=0xcc))
+			free(curr->suppagetable);
 		curr->pagedir = NULL;
 		pagedir_activate (NULL);
 		pagedir_destroy (pd);
@@ -479,7 +481,7 @@ done:
 	/* We arrive here whether the load is successful or not. */
 
 	// TEMP
-	// palloc_free_page(fn_copy);
+	palloc_free_page(fn_copy);
 	return success;
 }
 
@@ -614,8 +616,8 @@ setup_stack (void **esp, char* file_name)
 	kpage =	allocate_frame (((uint8_t *) PHYS_BASE) - PGSIZE, PAL_USER | PAL_ZERO);
 	if (kpage != NULL)
 	{
-		// success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-		// if (success)
+		//success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+		//if (success)
 		if(1>0)
 		{
 			*esp = PHYS_BASE;
