@@ -143,6 +143,7 @@ page_fault (struct intr_frame *f)
      [IA32-v3a] 5.15 "Interrupt 14--Page Fault Exception
      (#PF)". */
   asm ("movl %%cr2, %0" : "=r" (fault_addr));
+  barrier();
 
   /* Turn interrupts back on (they were only off so that we could
      be assured of reading CR2 before it changed). */
@@ -166,14 +167,28 @@ page_fault (struct intr_frame *f)
   {
     if((fault_addr==NULL)||(is_kernel_vaddr(fault_addr)))
       thread_exit();
+    void* currentesp = f->esp;
+    if(currentesp-fault_addr==-8)
+      {
+
+        // printf("%x = Maybe access to stack. %p = currentesp  | %p = fault_addr\n",currentesp-fault_addr,currentesp,fault_addr);
+        struct sup_page_table_entry* stackgrow = allocate_page(NULL,0,pg_round_down(fault_addr),0,0,true);
+        uint8_t *kpage;
+      	kpage =	allocate_frame (pg_round_down(fault_addr), PAL_USER | PAL_ZERO);
+        return;
+
+      }
     fault_addr = pg_round_down(fault_addr);
 
     struct sup_page_table_entry check;
     struct hash_elem *he;
     struct sup_page_table_entry* spte;
     check.user_vaddr=(uint32_t *)fault_addr;
+    barrier();
     he= hash_find(&thread_current()->hash, &check.hash_elem);
+
     spte = he !=NULL ? hash_entry(he, struct sup_page_table_entry, hash_elem) : NULL;
+    // printf("%p = he | %p = spte\n",he,spte);
     if(spte==NULL)
     {
       return;
@@ -189,6 +204,7 @@ page_fault (struct intr_frame *f)
       }
       else
       {
+        // printf("%p = spte->user_vaddr | %p = fault_addr\n",spte->user_vaddr,fault_addr);
         ASSERT ((spte->read_bytes + spte->zero_bytes) % PGSIZE == 0);
       	ASSERT (pg_ofs (spte->user_vaddr) == 0);
       	ASSERT (spte->ofs % PGSIZE == 0);
@@ -209,7 +225,7 @@ page_fault (struct intr_frame *f)
 
       		if (kpage == NULL)
       			return;
-
+          barrier();
       		/* Load this page. */
       		if (file_read (spte->file, kpage, page_read_bytes) != (int) page_read_bytes)
       		{
@@ -217,7 +233,7 @@ page_fault (struct intr_frame *f)
       			return;
       		}
       		memset (kpage + page_read_bytes, 0, page_zero_bytes);
-
+          barrier();
       		/* Add the page to the process's address space. */
 //      		if (!install_page (spte->user_vaddr, kpage, spte->writable))
           /*if(pagedir_get_page (thread_current()->pagedir, spte->user_vaddr) == NULL)

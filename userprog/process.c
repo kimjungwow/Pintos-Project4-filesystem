@@ -601,6 +601,7 @@ static bool
 setup_stack (void **esp, char* file_name)
 {
 	uint8_t *kpage;
+	
 	bool success = false;
 	char *fn_copy;
 
@@ -658,6 +659,7 @@ setup_stack (void **esp, char* file_name)
 			uint8_t woowoo = (uint8_t)0;
 			jinesp+=4;
 			*jinesp=woowoo;
+
 		}
 		else
 		{

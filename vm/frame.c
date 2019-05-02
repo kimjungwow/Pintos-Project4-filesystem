@@ -4,6 +4,7 @@ extern struct pool user_pool;
 
 struct frame_table_entry** frametable;
 size_t frametableindex;
+struct lock frametablelock;
 /*
  * Initialize frame table
  */
@@ -19,6 +20,7 @@ frame_init (void)
     memset(frametable[i],0,sizeof(struct frame_table_entry));
   }
   hash_init(&ftehash,hash_fte,compare_fte,NULL);
+  lock_init(&frametablelock);
   return;
 }
 /*
@@ -27,6 +29,8 @@ frame_init (void)
 void *
 allocate_frame (void *uaddr, enum palloc_flags flags)
 {
+  lock_acquire(&frametablelock);
+
   uint32_t *frame = palloc_get_page(flags);
   size_t i;
   for(i=0;i<frametableindex;i++)
@@ -38,7 +42,9 @@ allocate_frame (void *uaddr, enum palloc_flags flags)
       frametable[i]->owner = thread_current();
       frametable[i]->uaddr = (uint32_t*)uaddr;
       // frametable[i]->hash_elem = elem;
+      barrier();
       hash_insert(&ftehash,&frametable[i]->hash_elem);
+      barrier();
       uint32_t* fault_addr = pg_round_down(uaddr);
       struct sup_page_table_entry check;
       struct hash_elem *he;
@@ -51,17 +57,21 @@ allocate_frame (void *uaddr, enum palloc_flags flags)
         frametable[i]->spte=spte;
         if(pagedir_get_page (thread_current()->pagedir, uaddr) == NULL)
         {
+
           pagedir_set_page (thread_current()->pagedir, uaddr, frame, spte->writable);
+          lock_release(&frametablelock);
           return frame;
         }
         printf("NOT REACHED\n");
         palloc_free_page(frame);
+        lock_release(&frametablelock);
 
         return NULL;
       }
       else{
         printf("FAIL TO FIND SPTE\n");
         palloc_free_page(frame);
+        lock_release(&frametablelock);
         return NULL;
       }
     }
@@ -69,6 +79,7 @@ allocate_frame (void *uaddr, enum palloc_flags flags)
   //palloc_free_page(frame);
   printf("RUN OUT OF FRAME\n");
   palloc_free_page(frame);
+  lock_release(&frametablelock);
   return NULL;
 
 }

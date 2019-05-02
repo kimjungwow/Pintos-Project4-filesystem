@@ -98,7 +98,7 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
-    char *process_stack;
+    uint32_t *process_stack;
     int returnstatus;
     struct file* fdtable[64];
     int nextfd;
@@ -116,9 +116,11 @@ struct thread
     bool wait;
 
 
+    struct hash hash;
+    struct sup_page_table_entry** suppagetable;
+    
 #endif
-  struct hash hash;
-  struct sup_page_table_entry** suppagetable;
+
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
