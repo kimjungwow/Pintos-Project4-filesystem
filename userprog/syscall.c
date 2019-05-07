@@ -9,7 +9,7 @@
 #include "filesys/file.h"
 #include "filesys/filesys.h"
 
-/*d Reads a byte at user virtual address UADDR.
+/* Reads a byte at user virtual address UADDR.
    UADDR must be below PHYS_BASE.
    Returns the byte value if successful, -1 if a segfault
    occurred. */
@@ -317,22 +317,25 @@ syscall_handler (struct intr_frame *f)
 			thread_current()->returnstatus=-1;
 			thread_exit();
 		}
+		// if(*(uint8_t **)tempesp>PHYS_BASE)
 		if(*(uint32_t *)tempesp>PHYS_BASE)
 		{
 			thread_current()->returnstatus=-1;
 			thread_exit();
 		}
-
+		// if((put_user(*(uint8_t **)tempesp,size)==-1)||tempesp==NULL)
 		if((get_user(*(uint8_t **)tempesp)==-1)||(tempesp==NULL))
 		{
 			thread_current()->returnstatus=-1;
 			thread_exit();
 		}
+
 		char *buffer;
 
 		buffer = *(char **)tempesp;
 		tempesp+=4;
 		unsigned size = *(unsigned *)tempesp;
+
 		unsigned i;
 		uint8_t fdzero;
 		if(fd == 0)
@@ -359,6 +362,11 @@ syscall_handler (struct intr_frame *f)
 				else if(get_user(*(uint8_t **)filetoread)==-1)
 				{
 					f->eax=-1;
+				}
+				else if(is_code_vaddr(buffer))
+				{
+					thread_current()->returnstatus=-1;
+					thread_exit();
 				}
 				else
 				{

@@ -160,9 +160,25 @@ page_fault (struct intr_frame *f)
 
   if(!user)
   {
-    f->eip=f->eax;
-    f->eax =0xffffffff;
-    return;
+    if(not_present)
+    {
+      if(is_code_vaddr(fault_addr))
+      {
+        thread_current()->returnstatus=-1;
+        thread_exit();
+      }
+      struct sup_page_table_entry* stackgrow = allocate_page(NULL,0,pg_round_down(fault_addr),0,0,true);
+      uint8_t *kpage;
+      kpage =	allocate_frame (pg_round_down(fault_addr), PAL_USER | PAL_ZERO);
+      return;
+
+    }
+    else
+    {
+      f->eip=f->eax;
+      f->eax =0xffffffff;
+      return;
+    }
   }
   else
   {
@@ -171,7 +187,12 @@ page_fault (struct intr_frame *f)
       thread_current()->returnstatus=-1;
       thread_exit();
     }
-
+    // if(is_code_vaddr(fault_addr))
+    // {
+    //   thread_current()->returnstatus=-1;
+    //   // thread_exit();
+    //   return;
+    // }
 
     // fault_addr = pg_round_down(fault_addr);
 
@@ -182,12 +203,17 @@ page_fault (struct intr_frame *f)
     he = hash_find(&thread_current()->hash, &check.hash_elem);
 
     spte = he !=NULL ? hash_entry(he, struct sup_page_table_entry, hash_elem) : NULL;
-    // printf("%p = he | %p = spte\n",he,spte);
+    // printf("%p = fault_addr\n",fault_addr);
+
     if(spte==NULL)
     {
       void* currentesp = f->esp;
-      // printf("%d=bool |%u = Maybe access to stack. %p = currentesp  | %p = fault_addr\n",currentesp<=fault_addr,currentesp-fault_addr,currentesp,fault_addr);
-      if((currentesp<=fault_addr)||(currentesp-fault_addr==32)||(currentesp-fault_addr==4))
+      if(is_code_vaddr(fault_addr))
+      {
+        thread_current()->returnstatus=-1;
+        thread_exit();
+      }
+      else if((currentesp<=fault_addr)||(currentesp-fault_addr==32)||(currentesp-fault_addr==4))
             // if(((unsigned int*)currentesp-(unsigned int*)fault_addr<=0)||(currentesp-fault_addr==32)||(currentesp-fault_addr==4))
       {
 
@@ -236,7 +262,12 @@ page_fault (struct intr_frame *f)
     		// uint8_t *kpage = palloc_get_page (PAL_USER);
 
     		if (kpage == NULL)
-    			return;
+        {
+          thread_current()->returnstatus=-1;
+          thread_exit();
+          printf("CODE SECTION\n");
+        }
+
 
     		/* Load this page. */
         lock_acquire(&handlesem);

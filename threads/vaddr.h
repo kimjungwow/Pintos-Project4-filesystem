@@ -54,16 +54,23 @@ static inline void *pg_round_down (const void *va) {
 
 /* Returns true if VADDR is a user virtual address. */
 static inline bool
-is_user_vaddr (const void *vaddr) 
+is_user_vaddr (const void *vaddr)
 {
   return vaddr < PHYS_BASE;
 }
 
 /* Returns true if VADDR is a kernel virtual address. */
 static inline bool
-is_kernel_vaddr (const void *vaddr) 
+is_kernel_vaddr (const void *vaddr)
 {
   return vaddr >= PHYS_BASE;
+}
+
+/* Returns true if VADDR is pointing to code section. */
+static inline bool
+is_code_vaddr (const void *vaddr)
+{
+  return vaddr >= (void *)0x08048000 && vaddr <= (void *)0x08058000;
 }
 
 /* Returns kernel virtual address at which physical address PADDR
@@ -85,5 +92,7 @@ vtop (const void *vaddr)
 
   return (uintptr_t) vaddr - (uintptr_t) PHYS_BASE;
 }
+
+
 
 #endif /* threads/vaddr.h */
