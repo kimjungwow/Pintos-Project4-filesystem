@@ -151,7 +151,7 @@ mmap (int fd, void *addr)
 void
 munmap (mapid_t mapid)
 {
-  syscall1 (SYS_MUNMAP, mapid);
+    syscall1 (SYS_MUNMAP, mapid);
 }
 
 bool

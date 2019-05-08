@@ -162,14 +162,18 @@ page_fault (struct intr_frame *f)
   {
     if(not_present)
     {
-      if(is_code_vaddr(fault_addr))
+      if((pagedir_get_page(thread_current()->pagedir, fault_addr)==NULL && thread_current()->process_stack>=fault_addr)||is_code_section(thread_current()->process_stack))
+      // if(is_code_vaddr(fault_addr))
+      // if(is_code_vaddr(fault_addr)&&pagedir_get_page(thread_current()->pagedir,pg_round_down(fault_addr-2*PGSIZE))==NULL) // To avoid allocate something on code section or below code section
       {
         thread_current()->returnstatus=-1;
         thread_exit();
       }
+      //Why do we need this?
       struct sup_page_table_entry* stackgrow = allocate_page(NULL,0,pg_round_down(fault_addr),0,0,true);
       uint8_t *kpage;
-      kpage =	allocate_frame (pg_round_down(fault_addr), PAL_USER | PAL_ZERO);
+      kpage =	allocate_frame (pg_round_down(fault_addr), PAL_USER | PAL_ZERO); //PAL_USER because it's for stack??
+
       return;
 
     }
@@ -187,12 +191,13 @@ page_fault (struct intr_frame *f)
       thread_current()->returnstatus=-1;
       thread_exit();
     }
-    // if(is_code_vaddr(fault_addr))
-    // {
-    //   thread_current()->returnstatus=-1;
-    //   // thread_exit();
-    //   return;
-    // }
+
+    if(is_code_vaddr(f->esp))
+    {
+      thread_current()->returnstatus=-1;
+      // thread_exit();
+      return;
+    }
 
     // fault_addr = pg_round_down(fault_addr);
 

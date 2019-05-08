@@ -70,8 +70,19 @@ is_kernel_vaddr (const void *vaddr)
 static inline bool
 is_code_vaddr (const void *vaddr)
 {
-  return vaddr >= (void *)0x08048000 && vaddr <= (void *)0x08058000;
+  // return vaddr <= (void *)0x08058000;
+  return vaddr < (void *)0xa0058000;
+  // return vaddr >= (void *)0x08048000 && vaddr <= (void *)0x08058000;
 }
+
+static inline bool
+is_code_section (const void *vaddr)
+{
+  return vaddr <= (void *)0x08058000;
+  // return vaddr < (void *)0xa0058000;
+  // return vaddr >= (void *)0x08048000 && vaddr <= (void *)0x08058000;
+}
+
 
 /* Returns kernel virtual address at which physical address PADDR
    is mapped. */

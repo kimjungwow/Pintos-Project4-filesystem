@@ -50,6 +50,7 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f)
 {
+	thread_current()->process_stack=f->esp;
 	if((f->esp>PHYS_BASE)||(get_user((uint8_t *)f->esp)==-1))
 	{
 		thread_current()->returnstatus=-1;
@@ -318,7 +319,7 @@ syscall_handler (struct intr_frame *f)
 			thread_exit();
 		}
 		// if(*(uint8_t **)tempesp>PHYS_BASE)
-		if(*(uint32_t *)tempesp>PHYS_BASE)
+		if(*(uint32_t *)tempesp>PHYS_BASE||(tempesp==NULL))
 		{
 			thread_current()->returnstatus=-1;
 			thread_exit();
@@ -363,7 +364,8 @@ syscall_handler (struct intr_frame *f)
 				{
 					f->eax=-1;
 				}
-				else if(is_code_vaddr(buffer))
+				else if(is_code_vaddr(buffer)) // For pt-write-code2
+				// else if(is_code_vaddr(buffer)&&pagedir_get_page(thread_current()->pagedir,pg_round_down(buffer-2*PGSIZE))==NULL) // To avoid allocate something on code section or below code section
 				{
 					thread_current()->returnstatus=-1;
 					thread_exit();
@@ -517,10 +519,41 @@ syscall_handler (struct intr_frame *f)
 	}
 	case SYS_MMAP:
 	{
+		char* tempesp = (char *)f->esp;
+
+		tempesp+=4;
+		int fd = *(int *)tempesp;
+		tempesp+=4;
+		if((fd<0)||(fd>64))
+		{
+			thread_current()->returnstatus=-1;
+			thread_exit();
+		}
+
+		if(*(uint32_t *)tempesp>PHYS_BASE||(tempesp==NULL))
+		{
+			thread_current()->returnstatus=-1;
+			thread_exit();
+		}
+
+		if((get_user(*(uint8_t **)tempesp)==-1)||(tempesp==NULL))
+		{
+			thread_current()->returnstatus=-1;
+			thread_exit();
+		}
+
+		char *addr;
+
+		addr = *(char **)tempesp;
+
 		break;
 	}
 	case SYS_MUNMAP:
 	{
+		char* tempesp = (char *)f->esp;
+
+		tempesp+=4;
+		mapid_t mapid = *(int *)tempesp;
 		break;
 	}
 	case SYS_CHDIR:
