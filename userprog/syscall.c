@@ -490,7 +490,7 @@ syscall_handler (struct intr_frame *f)
 	}
 	case SYS_CLOSE:
 	{
-		char* tempesp = (char *)f->esp; 
+		char* tempesp = (char *)f->esp;
 		tempesp+=4;
 		int fd = *(int *)tempesp;
 		if((fd<0)||(fd>64))
@@ -525,7 +525,7 @@ syscall_handler (struct intr_frame *f)
 		tempesp+=4;
 		int fd = *(int *)tempesp;
 		tempesp+=4;
-		if((fd<0)||(fd>64)||thread_current()->fdtable[fd]==NULL)
+		if((fd<2)||(fd>64)||thread_current()->fdtable[fd]==NULL)
 		{
 			f->eax=MAP_FAILED;
 			break;
@@ -537,14 +537,13 @@ syscall_handler (struct intr_frame *f)
 			break;
 		}
 
-		/*if((get_user(*(uint8_t **)tempesp)==-1)||(tempesp==NULL))
-		{
-			thread_current()->returnstatus=-1;
-			thread_exit();
-		}*/
-
 		char *addr;
 		addr = *(char **)tempesp;
+		if(pg_ofs(addr)!=0||file_length(thread_current()->fdtable[fd])==0)
+		{
+			f->eax=MAP_FAILED;
+			break;
+		}
 		if(thread_current()->suppagetable!=NULL)
 		{
 
@@ -584,6 +583,7 @@ syscall_handler (struct intr_frame *f)
 				break;
 			}
 			new->mapid=thread_current()->next_mapid;
+			new->mmapfd=fd;
 			already+=PGSIZE;
 		}
 
@@ -610,7 +610,11 @@ syscall_handler (struct intr_frame *f)
 			{
 				if(spte->dirty)
 				{
-					//Write back
+					void* target = (void *)((char *)spte->file + spte->ofs);
+					write(spte->mmapfd,target,filesize(spte->mmapfd));
+
+
+					//Write backb
 				}
 				hash_next(&i);
 				hash_delete(&thread_current()->hash,&spte->hash_elem);

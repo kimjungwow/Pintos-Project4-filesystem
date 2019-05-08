@@ -57,50 +57,6 @@ allocate_page (struct file *file, off_t ofs, uint8_t *upage,
 }
 
 
-/*
-struct sup_page_table_entry *
-allocate_page (struct file *file, off_t ofs, uint8_t *upage,
-             uint32_t read_bytes, uint32_t zero_bytes, bool writable)
-{
- struct sup_page_table_entry** given = thread_current()->suppagetable;
- size_t i,j;
- for(i=0;i<suppagetableindex;i++)
- {
-   if(given==NULL)
-     {page_init();
-   given = thread_current()->suppagetable;}
-
-   struct sup_page_table_entry* myspte = given+i*(sizeof (struct sup_page_table_entry))/(sizeof(struct sup_page_table_entry*));
-   if(myspte->user_vaddr==NULL)
-   {
-
-     myspte->user_vaddr=(uint32_t *)upage;
-     myspte->access_time=(uint64_t)timer_ticks();
-     hash_insert(&thread_current()->hash,&myspte->hash_elem);
-     if(file!=NULL)
-     {
-       myspte->filerelated = true;
-       myspte->file = file;
-       myspte->ofs = ofs;
-       myspte->read_bytes = read_bytes;
-       myspte->zero_bytes = zero_bytes;
-     }
-     else
-     {
-       myspte->filerelated = false;
-     }
-     myspte->writable=writable;
-
-     return myspte;
-   }
- }
- return NULL;
-
-}*/
-
-
-
-
 unsigned
 hash_spte(const struct hash_elem* he,void *aux UNUSED)
 {

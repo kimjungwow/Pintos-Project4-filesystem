@@ -24,6 +24,7 @@ struct sup_page_table_entry
 	uint64_t access_time;
 	struct hash_elem hash_elem;
 	int mapid;
+	int mmapfd;
 
 	bool filerelated;
 	struct file* file;
