@@ -545,10 +545,26 @@ syscall_handler (struct intr_frame *f)
 		char *addr;
 
 		addr = *(char **)tempesp;
-		allocate_page(thread_current()->fdtable[fd], 0, addr,
-			file_length(thread_current()->fdtable[fd])&~PGMASK,
-			PGSIZE-(file_length(thread_current()->fdtable[fd])&PGMASK), true);
-
+		off_t remain = file_length(thread_current()->fdtable[fd]), already=0;
+		while(remain>0)
+		{
+			off_t read_bytes, zero_bytes;
+			if (remain>PGSIZE)
+			{
+				read_bytes=PGSIZE;
+				zero_bytes=0;
+				remain-=PGSIZE;
+			}
+			else
+			{
+				read_bytes=remain;
+				zero_bytes=PGSIZE-read_bytes;
+				remain-=read_bytes;
+			}
+			allocate_page(thread_current()->fdtable[fd], already, addr+already,
+				read_bytes, zero_bytes, true);
+			already+=PGSIZE;
+		}
 
 		break;
 	}
