@@ -8,6 +8,8 @@
 #include "lib/kernel/console.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
+#include "vm/page.h"
+#include "lib/kernel/hash.h"
 
 /* Reads a byte at user virtual address UADDR.
    UADDR must be below PHYS_BASE.
@@ -488,8 +490,7 @@ syscall_handler (struct intr_frame *f)
 	}
 	case SYS_CLOSE:
 	{
-		char* tempesp = (char *)f->esp;
-
+		char* tempesp = (char *)f->esp; 
 		tempesp+=4;
 		int fd = *(int *)tempesp;
 		if((fd<0)||(fd>64))
@@ -526,14 +527,14 @@ syscall_handler (struct intr_frame *f)
 		tempesp+=4;
 		if((fd<0)||(fd>64)||thread_current()->fdtable[fd]==NULL)
 		{
-			thread_current()->returnstatus=-1;
-			thread_exit();
+			f->eax=MAP_FAILED;
+			break;
 		}
 
-		if(*(uint32_t *)tempesp>PHYS_BASE||(tempesp==NULL))
+		if(*(uint32_t *)tempesp>PHYS_BASE||(*(char **)tempesp==NULL))
 		{
-			thread_current()->returnstatus=-1;
-			thread_exit();
+			f->eax=MAP_FAILED;
+			break;
 		}
 
 		/*if((get_user(*(uint8_t **)tempesp)==-1)||(tempesp==NULL))
@@ -543,8 +544,22 @@ syscall_handler (struct intr_frame *f)
 		}*/
 
 		char *addr;
-
 		addr = *(char **)tempesp;
+		if(thread_current()->suppagetable!=NULL)
+		{
+
+			struct sup_page_table_entry check;
+			check.user_vaddr=pg_round_down(addr);
+			struct hash_elem *he = hash_find(&thread_current()->hash, &check.hash_elem);
+			if (he!=NULL)
+			{
+				f->eax=MAP_FAILED;
+				break;
+			}
+		}
+
+
+
 		off_t remain = file_length(thread_current()->fdtable[fd]), already=0;
 		while(remain>0)
 		{
@@ -561,10 +576,19 @@ syscall_handler (struct intr_frame *f)
 				zero_bytes=PGSIZE-read_bytes;
 				remain-=read_bytes;
 			}
-			allocate_page(thread_current()->fdtable[fd], already, addr+already,
+			struct sup_page_table_entry *new = allocate_page(thread_current()->fdtable[fd], already, addr+already,
 				read_bytes, zero_bytes, true);
+			if(new==NULL)
+			{
+				f->eax=MAP_FAILED;
+				break;
+			}
+			new->mapid=thread_current()->next_mapid;
 			already+=PGSIZE;
 		}
+
+		f->eax=(mapid_t)thread_current()->next_mapid;
+		thread_current()->next_mapid++;
 
 		break;
 	}
@@ -573,7 +597,32 @@ syscall_handler (struct intr_frame *f)
 		char* tempesp = (char *)f->esp;
 
 		tempesp+=4;
-		mapid_t mapid = *(int *)tempesp;
+		mapid_t mapid = *(mapid_t *)tempesp;
+
+		struct hash_iterator i;
+
+		hash_first (&i, &thread_current()->hash);
+		hash_next(&i);
+		while (hash_cur (&i))
+		{
+			struct sup_page_table_entry *spte = hash_entry (hash_cur (&i), struct sup_page_table_entry, hash_elem);
+			if((mapid_t)spte->mapid==mapid)
+			{
+				if(spte->dirty)
+				{
+					//Write back
+				}
+				hash_next(&i);
+				hash_delete(&thread_current()->hash,&spte->hash_elem);
+				free(spte);
+			}
+			else
+			{
+				hash_next(&i);
+			}
+
+		}
+
 		break;
 	}
 	case SYS_CHDIR:

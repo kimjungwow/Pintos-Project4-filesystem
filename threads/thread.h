@@ -118,7 +118,8 @@ struct thread
 
     struct hash hash;
     struct sup_page_table_entry** suppagetable;
-    
+    int next_mapid;
+
 #endif
 
 

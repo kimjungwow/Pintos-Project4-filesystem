@@ -23,6 +23,7 @@ struct sup_page_table_entry
 	uint32_t* user_vaddr;
 	uint64_t access_time;
 	struct hash_elem hash_elem;
+	int mapid;
 
 	bool filerelated;
 	struct file* file;
