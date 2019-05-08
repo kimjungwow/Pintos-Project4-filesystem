@@ -524,7 +524,7 @@ syscall_handler (struct intr_frame *f)
 		tempesp+=4;
 		int fd = *(int *)tempesp;
 		tempesp+=4;
-		if((fd<0)||(fd>64))
+		if((fd<0)||(fd>64)||thread_current()->fdtable[fd]==NULL)
 		{
 			thread_current()->returnstatus=-1;
 			thread_exit();
@@ -536,15 +536,19 @@ syscall_handler (struct intr_frame *f)
 			thread_exit();
 		}
 
-		if((get_user(*(uint8_t **)tempesp)==-1)||(tempesp==NULL))
+		/*if((get_user(*(uint8_t **)tempesp)==-1)||(tempesp==NULL))
 		{
 			thread_current()->returnstatus=-1;
 			thread_exit();
-		}
+		}*/
 
 		char *addr;
 
 		addr = *(char **)tempesp;
+		allocate_page(thread_current()->fdtable[fd], 0, addr,
+			file_length(thread_current()->fdtable[fd])&~PGMASK,
+			PGSIZE-(file_length(thread_current()->fdtable[fd])&PGMASK), true);
+
 
 		break;
 	}
