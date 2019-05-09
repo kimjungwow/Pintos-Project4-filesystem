@@ -39,7 +39,6 @@ allocate_page (struct file *file, off_t ofs, uint8_t *upage,
   myspte->access_time=(uint64_t)timer_ticks();
   myspte->mapid=0;
   myspte->mmapfd=0;
-
   if(file!=NULL)
   {
     myspte->filerelated = true;
