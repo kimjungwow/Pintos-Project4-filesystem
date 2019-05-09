@@ -43,4 +43,6 @@ allocate_page (struct file *file, off_t ofs, uint8_t *upage,
 uint32_t read_bytes, uint32_t zero_bytes, bool writable);
 unsigned hash_spte(const struct hash_elem* he, void* aux UNUSED);
 bool compare_spte(const struct hash_elem* a,const struct hash_elem* b,void* aux UNUSED);
+void before_munmap(struct sup_page_table_entry* spte);
+void destroy_spt(void);
 #endif /* vm/page.h */

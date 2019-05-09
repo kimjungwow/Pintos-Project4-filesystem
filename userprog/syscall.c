@@ -361,7 +361,7 @@ syscall_handler (struct intr_frame *f)
 			else
 			{
 				struct file* filetoread = thread_current()->fdtable[fd];
-				
+
 				if (filetoread==NULL)
 					f->eax=-1;
 				else if(get_user(*(uint8_t **)filetoread)==-1)
@@ -615,38 +615,14 @@ syscall_handler (struct intr_frame *f)
 				{
 					spte_set_dirty(spte->user_vaddr,true);
 					void* target = (void *)((char *)spte->file + spte->ofs);
-
 					lock_acquire(&handlesem);
 					struct file* filetowrite = thread_current()->fdtable[spte->mmapfd];
-					// off_t size = (int)(file_length(filetowrite));
 					off_t size = strlen((char *)spte->user_vaddr);
-					//printf("%d =strlen | %d = file length original\n",size,file_length(filetowrite));
-					/*printf("BUFFER ====================\n");
-					printf("%s\n",spte->user_vaddr);
-					printf("BUFFER ====================\n\n\n");
-					printf("FILE ====================\n");
-					void* bfer  = (void *)malloc(file_length(spte->file));
-					file_read(spte->file,bfer,file_length(spte->file));
-					putbuf(bfer, file_length(spte->file));
-					free(bfer);
-
-					printf("FILE ====================\n\n\n");*/
-
 					file_seek(spte->file,0);
-
 					off_t temppos = file_tell(spte->file);
 					off_t writebytes = file_write(spte->file,spte->user_vaddr, strlen((char *)spte->user_vaddr));
 					file_seek(spte->file,temppos);
-					// off_t writebytes = write(spte->mmapfd,spte->user_vaddr,strlen((char *)spte->user_vaddr));
-					/*printf("WRITE TO FILE ============\n\n");
-					printf("%s\n",spte->user_vaddr);
-					printf("File addr : %p \n",spte->file);
-					printf("wrote %d bytes \n",writebytes);
-					printf("WRITE TO FILE ============\n\n");*/
 					lock_release(&handlesem);
-
-
-					//Write backb
 				}
 				hash_next(&i);
 				hash_delete(&thread_current()->hash,&spte->hash_elem);

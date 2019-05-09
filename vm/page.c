@@ -36,6 +36,8 @@ allocate_page (struct file *file, off_t ofs, uint8_t *upage,
     return NULL;
   myspte->user_vaddr=(uint32_t *)upage;
   myspte->access_time=(uint64_t)timer_ticks();
+  myspte->mapid=0;
+  myspte->mmapfd=0;
 
   if(file!=NULL)
   {
@@ -54,6 +56,46 @@ allocate_page (struct file *file, off_t ofs, uint8_t *upage,
   return myspte;
 
 
+}
+
+void
+before_munmap(struct sup_page_table_entry* spte)
+{
+  if(spte->mapid)
+  {
+    if(pagedir_is_dirty(thread_current()->pagedir,spte->user_vaddr))
+    {
+      spte_set_dirty(spte->user_vaddr,true);
+      void* target = (void *)((char *)spte->file + spte->ofs);
+      lock_acquire(&handlesem);
+      struct file* filetowrite = thread_current()->fdtable[spte->mmapfd];
+      off_t size = strlen((char *)spte->user_vaddr);
+      file_seek(spte->file,0);
+      off_t temppos = file_tell(spte->file);
+      off_t writebytes = file_write(spte->file,spte->user_vaddr, strlen((char *)spte->user_vaddr));
+      file_seek(spte->file,temppos);
+      lock_release(&handlesem);
+    }
+  }
+
+}
+
+void
+destroy_spt(void) // In fact, only munmap.
+{
+
+  struct thread *curr = thread_current();
+  struct hash_iterator i;
+  hash_first (&i, &curr->hash);
+  hash_next(&i);
+  while (hash_cur (&i))
+  {
+    struct sup_page_table_entry *spte = hash_entry (hash_cur (&i), struct sup_page_table_entry, hash_elem);
+    before_munmap(spte);
+    hash_next(&i);
+    // hash_delete(&thread_current()->hash,&spte->hash_elem);
+    // free(spte);
+  }
 }
 
 
