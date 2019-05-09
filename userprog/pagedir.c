@@ -236,6 +236,32 @@ pagedir_set_accessed (uint32_t *pd, const void *vpage, bool accessed)
     }
 }
 
+/* Returns true if the PTE for virtual page VPAGE in PD is writable */
+bool
+pagedir_is_writable (uint32_t *pd, const void *vpage)
+{
+  uint32_t *pte = lookup_page (pd, vpage, false);
+  return pte != NULL && (*pte & PTE_W) != 0;
+}
+
+/* Sets the writable bit to WRITABLE in the PTE for virtual page
+   VPAGE in PD. */
+void
+pagedir_set_writable (uint32_t *pd, const void *vpage, bool writable)
+{
+  uint32_t *pte = lookup_page (pd, vpage, false);
+  if (pte != NULL)
+    {
+      if (writable)
+        *pte |= PTE_W;
+      else
+        {
+          *pte &= ~(uint32_t) PTE_W;
+          invalidate_pagedir (pd);
+        }
+    }
+}
+
 /* Loads page directory PD into the CPU's page directory base
    register. */
 void

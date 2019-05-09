@@ -13,8 +13,9 @@ page_init (void)
   thread_current()->suppagetable = (struct sup_page_table_entry**)calloc(sizeof(struct sup_page_table_entry),suppagetableindex);
   hash_init(&thread_current()->hash,hash_spte,compare_spte,NULL);
   thread_current()->next_mapid=3;
+  thread_current()->nextmmapfd=3;
+  // list_init(&thread_current()->mmaplist);
   size_t i;
-
 }
 
 

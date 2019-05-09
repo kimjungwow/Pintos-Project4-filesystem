@@ -15,5 +15,7 @@ bool pagedir_is_accessed (uint32_t *pd, const void *upage);
 void pagedir_set_accessed (uint32_t *pd, const void *upage, bool accessed);
 void pagedir_activate (uint32_t *pd);
 void spte_set_dirty(void *upage, bool dirty);
+bool pagedir_is_writable (uint32_t *pd, const void *vpage);
+void pagedir_set_writable (uint32_t *pd, const void *vpage, bool writable);
 
 #endif /* userprog/pagedir.h */

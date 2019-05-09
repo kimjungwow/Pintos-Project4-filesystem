@@ -112,7 +112,6 @@ syscall_handler (struct intr_frame *f)
 		palloc_free_page(cmd_line);
 
 
-
 		break;
 
 	}
@@ -368,12 +367,12 @@ syscall_handler (struct intr_frame *f)
 				{
 					f->eax=-1;
 				}
-				else if(is_code_vaddr(buffer)) // For pt-write-code2
-				// else if(is_code_vaddr(buffer)&&pagedir_get_page(thread_current()->pagedir,pg_round_down(buffer-2*PGSIZE))==NULL) // To avoid allocate something on code section or below code section
-				{
-					thread_current()->returnstatus=-1;
-					thread_exit();
-				}
+				// else if(is_code_vaddr(buffer)) // For pt-write-code2
+				// // else if(is_code_vaddr(buffer)&&pagedir_get_page(thread_current()->pagedir,pg_round_down(buffer-2*PGSIZE))==NULL) // To avoid allocate something on code section or below code section
+				// {
+				// 	thread_current()->returnstatus=-1;
+				// 	thread_exit();
+				// }
 				else
 				{
 					barrier();
@@ -559,9 +558,15 @@ syscall_handler (struct intr_frame *f)
 			}
 		}
 
+		lock_acquire(&handlesem);
+		struct file* openedfile = file_reopen(thread_current()->fdtable[fd]);
+		lock_release(&handlesem);
+		// thread_current()->mmaptable[thread_current()->nextmmapfd]=openedfile;
+		thread_current()->nextmmapfd++;
 
 
-		off_t remain = file_length(thread_current()->fdtable[fd]), already=0;
+
+		off_t remain = file_length(openedfile), already=0;
 		while(remain>0)
 		{
 			off_t read_bytes, zero_bytes;
@@ -577,11 +582,17 @@ syscall_handler (struct intr_frame *f)
 				zero_bytes=PGSIZE-read_bytes;
 				remain-=read_bytes;
 			}
-			struct sup_page_table_entry *new = allocate_page(thread_current()->fdtable[fd], already, addr+already,
+			struct sup_page_table_entry *new = allocate_page(openedfile, already, addr+already,
 				read_bytes, zero_bytes, true);
 			if(new==NULL)
 			{
 				f->eax=MAP_FAILED;
+				if(openedfile!=NULL)
+				{
+					lock_acquire(&handlesem);
+					file_close(openedfile);
+					lock_release(&handlesem);
+				}
 				break;
 			}
 			new->mapid=thread_current()->next_mapid;
@@ -590,7 +601,14 @@ syscall_handler (struct intr_frame *f)
 		}
 
 		f->eax=(mapid_t)thread_current()->next_mapid;
+		thread_current()->mmaptable[thread_current()->next_mapid]=openedfile;
+		// struct mmapentry* newme = (struct mmapentry*)malloc(sizeof (struct mmapentry));
+		// newme->mmapfile=openedfile;
+
+		// list_push_back(&thread_current()->mmaplist,&newme->me_elem);
+
 		thread_current()->next_mapid++;
+
 
 		break;
 	}
@@ -625,6 +643,7 @@ syscall_handler (struct intr_frame *f)
 					lock_release(&handlesem);
 				}
 				hash_next(&i);
+				file_close(spte->file);
 				hash_delete(&thread_current()->hash,&spte->hash_elem);
 				free(spte);
 			}
@@ -634,6 +653,14 @@ syscall_handler (struct intr_frame *f)
 			}
 
 		}
+		// if(thread_current()->mmaptable[mapid]!=NULL)
+		// {
+		// 	lock_acquire(&handlesem);
+		// 	file_close(thread_current()->mmaptable[mapid]);
+		// 	lock_release(&handlesem);
+		// }
+
+
 
 		break;
 	}

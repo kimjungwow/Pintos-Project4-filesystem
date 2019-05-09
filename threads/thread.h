@@ -115,10 +115,12 @@ struct thread
     struct file* file;
     bool wait;
 
-
     struct hash hash;
     struct sup_page_table_entry** suppagetable;
     int next_mapid;
+    struct file* mmaptable[128];
+    // struct list mmaplist;
+    int nextmmapfd;
 
 #endif
 

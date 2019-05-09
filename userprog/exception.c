@@ -9,7 +9,7 @@
 #include "filesys/directory.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
-
+#include "userprog/pagedir.h"
 /* Number of page faults processed. */
 static long long page_fault_cnt;
 
@@ -176,9 +176,27 @@ page_fault (struct intr_frame *f)
         thread_exit();
       }
       //Why do we need this?
-      struct sup_page_table_entry* stackgrow = allocate_page(NULL,0,pg_round_down(fault_addr),0,0,true);
-      uint8_t *kpage;
-      kpage =	allocate_frame (pg_round_down(fault_addr), PAL_USER | PAL_ZERO); //PAL_USER because it's for stack??
+      struct sup_page_table_entry check;
+      struct hash_elem *he;
+      struct sup_page_table_entry* spte;
+      check.user_vaddr=(uint32_t *)(pg_round_down(fault_addr));
+      he = hash_find(&thread_current()->hash, &check.hash_elem);
+
+      spte = he !=NULL ? hash_entry(he, struct sup_page_table_entry, hash_elem) : NULL;
+      if(spte==NULL)
+      {
+        f->eip=f->eax;
+        f->eax =0xffffffff;
+        return;
+      }
+      else
+      {
+        uint8_t *kpage;
+        kpage =	allocate_frame (pg_round_down(fault_addr), PAL_USER | PAL_ZERO); //PAL_USER because it's for stack??
+      }
+      // struct sup_page_table_entry* stackgrow = allocate_page(NULL,0,pg_round_down(fault_addr),0,0,true);
+      // uint8_t *kpage;
+      // kpage =	allocate_frame (pg_round_down(fault_addr), PAL_USER | PAL_ZERO); //PAL_USER because it's for stack??
 
       return;
 
@@ -187,7 +205,13 @@ page_fault (struct intr_frame *f)
     {
       f->eip=f->eax;
       f->eax =0xffffffff;
-      return;
+      // return;
+      thread_current()->returnstatus=-1;
+      if(lock_held_by_current_thread(&handlesem))
+        lock_release(&handlesem);
+      thread_exit();
+      // return;
+
     }
   }
   else
@@ -248,8 +272,8 @@ page_fault (struct intr_frame *f)
       if(spte->file==NULL)
       {
 
-      PANIC("NOT FILE CASE");
-      return;
+        PANIC("NOT FILE CASE");
+        return;
       }
       else
       {
@@ -289,6 +313,18 @@ page_fault (struct intr_frame *f)
     			return;
     		}
     		memset (kpage + page_read_bytes, 0, page_zero_bytes);
+        pagedir_set_writable(thread_current()->pagedir,spte->user_vaddr,spte->writable);
+        /*uint32_t* pte = lookup_page(thread_current()->pagedir,spte->user_vaddr,false);
+        if(pte!=NULL)
+        {
+
+          *pte&=PF_W;
+          if (active_pd () == pd)
+            {
+
+              pagedir_activate (pd);
+            }
+        }*/
         lock_release(&handlesem);
         return;
       }
