@@ -163,7 +163,12 @@ page_fault (struct intr_frame *f)
   {
     if(not_present)
     {
-      if((pagedir_get_page(thread_current()->pagedir, fault_addr)==NULL && thread_current()->process_stack>=fault_addr)||is_code_section(thread_current()->process_stack))
+      if(
+        (pagedir_get_page(thread_current()->pagedir, fault_addr)==NULL
+       && thread_current()->process_stack>=fault_addr
+       // && fault_addr >0x08058000
+        )
+       ||is_code_section(thread_current()->process_stack))
       // if(is_code_vaddr(fault_addr))
       // if(is_code_vaddr(fault_addr)&&pagedir_get_page(thread_current()->pagedir,pg_round_down(fault_addr-2*PGSIZE))==NULL) // To avoid allocate something on code section or below code section
       {
@@ -264,7 +269,7 @@ page_fault (struct intr_frame *f)
 
     		/* Get a page of memory. */
 
-    		uint8_t *kpage = allocate_frame (spte->user_vaddr, PAL_USER);
+    		uint8_t *kpage = allocate_frame (spte->user_vaddr, PAL_USER | PAL_ZERO);
     		// uint8_t *kpage = palloc_get_page (PAL_USER);
 
     		if (kpage == NULL)

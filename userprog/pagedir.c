@@ -170,6 +170,22 @@ pagedir_is_dirty (uint32_t *pd, const void *vpage)
   return pte != NULL && (*pte & PTE_D) != 0;
 }
 
+void
+spte_set_dirty(void *upage, bool dirty) {
+  uint32_t* addr = pg_round_down(upage);
+  struct sup_page_table_entry check;
+  struct hash_elem *he;
+  struct sup_page_table_entry* spte;
+  check.user_vaddr=addr;
+  he= hash_find(&thread_current()->hash, &check.hash_elem);
+  spte = he !=NULL ? hash_entry(he, struct sup_page_table_entry, hash_elem) : NULL;
+  if(spte!=NULL)
+  {
+    spte->dirty=dirty;
+  }
+
+}
+
 /* Set the dirty bit to DIRTY in the PTE for virtual page VPAGE
    in PD. */
 void
@@ -181,17 +197,6 @@ pagedir_set_dirty (uint32_t *pd, const void *vpage, bool dirty)
       if (dirty)
       {
         *pte |= PTE_D;
-        uint32_t* addr = pg_round_down(vpage);
-        struct sup_page_table_entry check;
-        struct hash_elem *he;
-        struct sup_page_table_entry* spte;
-        check.user_vaddr=addr;
-        he= hash_find(&thread_current()->hash, &check.hash_elem);
-        spte = he !=NULL ? hash_entry(he, struct sup_page_table_entry, hash_elem) : NULL;
-        if(spte!=NULL)
-        {
-          spte->dirty=true;
-        }
 
       }
       else
