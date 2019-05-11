@@ -18,12 +18,6 @@
 #ifndef VM_PAGE_H
 #define VM_PAGE_H
 
-// struct mmapentry
-// {
-// 	struct file* mmapfile;
-// 	struct list_elem me_elem;
-// };
-
 struct sup_page_table_entry
 {
 	uint32_t* user_vaddr;
@@ -40,6 +34,8 @@ struct sup_page_table_entry
 	bool writable;
 	bool dirty;
 	bool accessed;
+	bool inswap;
+	int swapindex;
 };
 
 void page_init (void);
@@ -51,4 +47,5 @@ unsigned hash_spte(const struct hash_elem* he, void* aux UNUSED);
 bool compare_spte(const struct hash_elem* a,const struct hash_elem* b,void* aux UNUSED);
 void before_munmap(struct sup_page_table_entry* spte);
 void destroy_spt(void);
+struct sup_page_table_entry* select_spte_for_evict(void);
 #endif /* vm/page.h */

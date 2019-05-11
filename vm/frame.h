@@ -37,5 +37,6 @@ void frame_init (void);
 void* allocate_frame (void *uaddr, enum palloc_flags flags);
 unsigned hash_fte(struct hash_elem he);
 bool compare_fte(struct hash_elem a, struct hash_elem b);
+struct frame_table_entry * select_fte_for_evict(void);
 
 #endif /* vm/frame.h */

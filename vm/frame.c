@@ -1,5 +1,5 @@
 #include "vm/frame.h"
-
+#include "vm/page.h"
 extern struct pool user_pool;
 
 // struct frame_table_entry** frametable;
@@ -23,9 +23,19 @@ frame_init (void)
 void *
 allocate_frame (void *uaddr, enum palloc_flags flags)
 {
+
+
   lock_acquire(&framesem);
 
+
   uint32_t *frame = palloc_get_page(flags);
+  if(frame==NULL)
+  {
+    printf("Frame table full!\n");
+    lock_release(&framesem);
+    PANIC("FRAMETABLEFULL");
+    return NULL;
+  }
   size_t i;
   struct frame_table_entry* newfte = (struct frame_table_entry*)malloc(sizeof(struct frame_table_entry));
   newfte->frame = frame;
@@ -68,6 +78,26 @@ allocate_frame (void *uaddr, enum palloc_flags flags)
   lock_release(&framesem);
   return NULL;
 
+}
+
+struct frame_table_entry *
+select_fte_for_evict(void)
+{
+  struct hash_iterator i;
+
+
+  hash_first (&i, &ftehash);
+  hash_next(&i);
+  struct frame_table_entry* evictfte = hash_entry (hash_cur (&i), struct frame_table_entry, hash_elem);
+  while (hash_cur (&i))
+  {
+    struct frame_table_entry *fte = hash_entry (hash_cur (&i), struct frame_table_entry, hash_elem);
+    if(fte->spte->access_time<evictfte->spte->access_time)
+      evictfte=fte;
+    hash_next(&i);
+
+  }
+  return evictfte;
 }
 
 

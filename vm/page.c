@@ -39,6 +39,8 @@ allocate_page (struct file *file, off_t ofs, uint8_t *upage,
   myspte->access_time=(uint64_t)timer_ticks();
   myspte->mapid=0;
   myspte->mmapfd=0;
+  myspte->inswap=false;
+  myspte->swapindex=-1;
   if(file!=NULL)
   {
     myspte->filerelated = true;
@@ -56,6 +58,26 @@ allocate_page (struct file *file, off_t ofs, uint8_t *upage,
   return myspte;
 
 
+}
+
+struct sup_page_table_entry *
+select_spte_for_evict(void)
+{
+  struct hash_iterator i;
+
+
+  hash_first (&i, &thread_current()->hash);
+  hash_next(&i);
+  struct sup_page_table_entry* evictspte = hash_entry (hash_cur (&i), struct sup_page_table_entry, hash_elem);
+  while (hash_cur (&i))
+  {
+    struct sup_page_table_entry *spte = hash_entry (hash_cur (&i), struct sup_page_table_entry, hash_elem);
+    if(spte->access_time<evictspte->access_time)
+      evictspte=spte;
+    hash_next(&i);
+
+  }
+  return evictspte;
 }
 
 void

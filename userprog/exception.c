@@ -176,24 +176,6 @@ page_fault (struct intr_frame *f)
         thread_exit();
       }
       //Why do we need this?
-      /*struct sup_page_table_entry check;
-      struct hash_elem *he;
-      struct sup_page_table_entry* spte;
-      check.user_vaddr=(uint32_t *)(pg_round_down(fault_addr));
-      he = hash_find(&thread_current()->hash, &check.hash_elem);
-
-      spte = he !=NULL ? hash_entry(he, struct sup_page_table_entry, hash_elem) : NULL;
-      if(spte==NULL)
-      {
-        f->eip=f->eax;
-        f->eax =0xffffffff;
-        return;
-      }
-      else
-      {
-        uint8_t *kpage;
-        kpage =	allocate_frame (pg_round_down(fault_addr), PAL_USER | PAL_ZERO); //PAL_USER because it's for stack??
-      }*/
       struct sup_page_table_entry* stackgrow = allocate_page(NULL,0,pg_round_down(fault_addr),0,0,true);
       uint8_t *kpage;
       kpage =	allocate_frame (pg_round_down(fault_addr), PAL_USER | PAL_ZERO); //PAL_USER because it's for stack??
