@@ -161,6 +161,7 @@ page_fault (struct intr_frame *f)
   // printf("fault_addr = %p\n",fault_addr);
   if(!user)
   {
+    // printf("%p = fault_addr KERNEL\n",fault_addr);
     if(not_present)
     {
       if(!is_user_vaddr(fault_addr))
@@ -207,6 +208,7 @@ page_fault (struct intr_frame *f)
   }
   else
   {
+
     if((fault_addr==NULL)||(is_kernel_vaddr(fault_addr)))
     {
       thread_current()->returnstatus=-1;
@@ -229,10 +231,12 @@ page_fault (struct intr_frame *f)
     he = hash_find(&thread_current()->hash, &check.hash_elem);
 
     spte = he !=NULL ? hash_entry(he, struct sup_page_table_entry, hash_elem) : NULL;
-    // printf("%p = fault_addr\n",fault_addr);
+
+
 
     if(spte==NULL)
     {
+      // printf("%p = fault_addr SPTE NULL\n",fault_addr);
       void* currentesp = f->esp;
       if(is_code_vaddr(fault_addr))
       {
@@ -260,14 +264,23 @@ page_fault (struct intr_frame *f)
     }
     else
     {
+
+      if(spte->inswap)
+      {
+        // printf("%p = fault_addr inswap | spte->uservaddr = %p\n",fault_addr,spte->user_vaddr);
+        swap_in(spte->user_vaddr);
+        return;
+      }
       if(spte->file==NULL)
       {
+
 
         PANIC("NOT FILE CASE");
         return;
       }
       else
       {
+        // printf("%p = fault_addr |  SPTE file = %p\n",fault_addr,spte->file);
         // printf("%p = spte->user_vaddr | %p = fault_addr\n",spte->user_vaddr,fault_addr);
         ASSERT ((spte->read_bytes + spte->zero_bytes) % PGSIZE == 0);
       	ASSERT (pg_ofs (spte->user_vaddr) == 0);
@@ -291,7 +304,7 @@ page_fault (struct intr_frame *f)
         {
           thread_current()->returnstatus=-1;
           thread_exit();
-          printf("CODE SECTION\n");
+          // printf("CODE SECTION\n");
         }
 
 

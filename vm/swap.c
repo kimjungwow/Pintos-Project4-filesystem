@@ -76,10 +76,16 @@ swap_in (void *addr)
     return false;
   lock_acquire(&framesem);
   uint32_t* frame = allocate_frame(spte->user_vaddr,PAL_USER|PAL_ZERO);
+  /*
   while(frame==NULL)
+  {
     frame = allocate_frame(spte->user_vaddr,PAL_USER|PAL_ZERO);
+  }*/
+  if(frame==NULL)
+    PANIC("frame is NULL\n");
 
   read_from_disk(frame,spte->swapindex);
+  bitmap_flip(swap_table,spte->swapindex);
   spte->swapindex= -1;
   spte->inswap=false;
 
@@ -118,10 +124,13 @@ swap_out (void)
 {
 
   struct frame_table_entry* evictfte = select_fte_for_evict();
-  printf("NULL? %p\n",evictfte);
+  // printf("NULL? %p\n",evictfte);
   size_t swapindex = bitmap_scan_and_flip (swap_table, 0,1,false);
   if (swapindex ==BITMAP_ERROR)
+  {
+    PANIC("BITMAP_ERROR\n");
     return false;
+  }
   //다른 process의 frame도 evict가능? 그러면 여기서 pd는 해당 frame의 주인의 pd여야함.
   pagedir_clear_page(evictfte->owner->pagedir,evictfte->spte->user_vaddr);
   evictfte->spte->swapindex=swapindex;
@@ -137,7 +146,8 @@ swap_out (void)
   palloc_free_page(evictfte->frame);
 
   free(evictfte);
-  lock_release(&framesem);
+  if(lock_held_by_current_thread(&framesem))
+    lock_release(&framesem);
   return true;
 }
 

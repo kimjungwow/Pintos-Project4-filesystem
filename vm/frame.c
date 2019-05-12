@@ -24,15 +24,14 @@ frame_init (void)
 void *
 allocate_frame (void *uaddr, enum palloc_flags flags)
 {
+  // printf("allocate_fram %p start\n",uaddr);
 
-
-  lock_acquire(&framesem);
-
-
+  if(!lock_held_by_current_thread(&framesem))
+    lock_acquire(&framesem);
   uint32_t *frame = palloc_get_page(flags);
   while(frame==NULL)
   {
-    printf("Frame table full!\n");
+    // printf("Frame table full!\n");
     // lock_release(&framesem);
     // PANIC("FRAMETABLEFULL");
     swap_out();
@@ -61,7 +60,9 @@ allocate_frame (void *uaddr, enum palloc_flags flags)
       pagedir_set_page (thread_current()->pagedir, uaddr, frame, spte->writable);
       list_push_back(&thread_current()->perprocess_frame_list,&newfte->perprocess_list_elem);
       list_push_back(&global_frame_list,&newfte->global_list_elem);
-      lock_release(&framesem);
+      if(lock_held_by_current_thread(&framesem))
+        lock_release(&framesem);
+      // printf("allocate_fram %p end\n",uaddr);
       return frame;
     }
     else
@@ -88,6 +89,27 @@ allocate_frame (void *uaddr, enum palloc_flags flags)
 struct frame_table_entry *
 select_fte_for_evict(void)
 {
+  if(!list_empty(&global_frame_list))
+  {
+    struct list_elem* e;
+    struct frame_table_entry *fte;
+    while(true)
+    {
+      e = list_begin (&global_frame_list);
+      fte = list_entry (e, struct frame_table_entry, global_list_elem);
+      if(pagedir_is_accessed (fte->owner->pagedir, fte->spte->user_vaddr))
+      {
+        pagedir_set_accessed (fte->owner->pagedir, fte->spte->user_vaddr,false);
+        list_remove(&fte->global_list_elem);
+        list_push_back(&global_frame_list,&fte->global_list_elem);
+      }
+      else
+      {
+        break;
+      }
+    }
+    return fte;
+  }
   /*
   struct hash_iterator i;
 
