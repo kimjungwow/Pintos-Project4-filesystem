@@ -140,7 +140,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick ();
-  struct list* list = &thread_current()->framelist;
+  /*struct list* list = &thread_current()->framelist;
   if (!list_empty(list)&&thread_current()->pagedir!=NULL)
     {
       struct list_elem *e;
@@ -156,7 +156,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
         }
         e = e->next;
       }
-    }
+    }*/
   //timer_interrupt마다 현재 thread의 frame의 access bit들 check하자.
   //accessbit이 설정된 애들은 access time을 지금 tick으로!
 }

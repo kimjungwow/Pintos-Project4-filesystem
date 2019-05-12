@@ -19,6 +19,7 @@
 #include "threads/vaddr.h"
 #include "syscall.h"
 
+extern struct lock framesem;
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 int a=0;
@@ -185,11 +186,35 @@ process_exit (void)
 
 	   to the kernel-only page directory. */
 
-	// Munmap!!
-	if(curr->suppagetable!=NULL)
-	{
-		destroy_spt();
-	}
+ lock_acquire(&framesem);
+ if(curr->suppagetable!=NULL)
+ {
+    destroy_spt();
+    if(!list_empty(&curr->perprocess_frame_list))
+    {
+       struct list_elem* e;
+       for (e = list_begin (&curr->perprocess_frame_list); e != list_end (&curr->perprocess_frame_list); )
+       {
+          struct frame_table_entry *fte = list_entry (e, struct frame_table_entry, perprocess_list_elem);
+          e = list_next (e);
+					// pagedir_clear_page(curr->pagedir,fte->spte->user_vaddr);
+
+          // palloc_free_page(fte->frame);
+          list_remove(&fte->perprocess_list_elem);
+          list_remove(&fte->global_list_elem);
+          free(fte);
+
+       }
+    }
+ }
+
+ lock_release(&framesem);
+
+ // Munmap!!
+ // if(curr->suppagetable!=NULL)
+ // {
+ //    destroy_spt();
+ // }
 
 	pd = curr->pagedir;
 	if (pd != NULL)

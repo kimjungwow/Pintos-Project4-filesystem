@@ -14,7 +14,7 @@
 #include "lib/kernel/hash.h"
 #include "threads/thread.h"
 
-struct hash ftehash;
+struct list global_frame_list;
 extern struct lock handlesem;
 
 #ifndef VM_FRAME_H
@@ -28,16 +28,14 @@ struct frame_table_entry
 	struct sup_page_table_entry* spte;
 
 	uint32_t* uaddr;
-	struct hash_elem hash_elem;
-	struct list_elem frame_elem;
+	struct list_elem global_list_elem;
+	struct list_elem perprocess_list_elem;
 };
 /*
 void* get_frame(void);
 void* get_frame_zero(void);*/
 void frame_init (void);
 void* allocate_frame (void *uaddr, enum palloc_flags flags);
-unsigned hash_fte(struct hash_elem he);
-bool compare_fte(struct hash_elem a, struct hash_elem b);
 struct frame_table_entry * select_fte_for_evict(void);
 
 #endif /* vm/frame.h */

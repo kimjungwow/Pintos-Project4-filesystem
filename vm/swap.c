@@ -124,15 +124,18 @@ swap_out (void)
   pagedir_clear_page(evictfte->owner->pagedir,evictfte->spte->user_vaddr);
   evictfte->spte->swapindex=swapindex;
   evictfte->spte->inswap=true;
-  lock_release(&framesem);
+
   write_to_disk(evictfte->frame, swapindex);
 
 
   //free_page는 user_addr인가? physical인가? = physical(frame)
-  list_remove(&evictfte->frame_elem);
+  list_remove(&evictfte->global_list_elem);
+  list_remove(&evictfte->perprocess_list_elem);
+
   palloc_free_page(evictfte->frame);
 
   free(evictfte);
+  lock_release(&framesem);
   return true;
 }
 

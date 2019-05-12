@@ -14,7 +14,7 @@ void
 frame_init (void)
 {
   frametableindex=user_pool.used_map->bit_cnt;
-  hash_init(&ftehash,hash_fte,compare_fte,NULL);
+  list_init(&global_frame_list);
   lock_init(&framesem);
   return;
 }
@@ -45,7 +45,7 @@ allocate_frame (void *uaddr, enum palloc_flags flags)
   newfte->owner = thread_current();
   newfte->uaddr = (uint32_t*)uaddr;
 
-  hash_insert(&ftehash,&newfte->hash_elem);
+  // hash_insert(&ftehash,&newfte->hash_elem);
   uint32_t* fault_addr = pg_round_down(uaddr);
   struct sup_page_table_entry check;
   struct hash_elem *he;
@@ -59,7 +59,8 @@ allocate_frame (void *uaddr, enum palloc_flags flags)
     if(pagedir_get_page (thread_current()->pagedir, uaddr) == NULL)
     {
       pagedir_set_page (thread_current()->pagedir, uaddr, frame, spte->writable);
-      list_push_back(&thread_current()->framelist,&newfte->frame_elem);
+      list_push_back(&thread_current()->perprocess_frame_list,&newfte->perprocess_list_elem);
+      list_push_back(&global_frame_list,&newfte->global_list_elem);
       lock_release(&framesem);
       return frame;
     }
@@ -87,6 +88,7 @@ allocate_frame (void *uaddr, enum palloc_flags flags)
 struct frame_table_entry *
 select_fte_for_evict(void)
 {
+  /*
   struct hash_iterator i;
 
 
@@ -101,22 +103,5 @@ select_fte_for_evict(void)
     hash_next(&i);
 
   }
-  return evictfte;
-}
-
-
-
-unsigned
-hash_fte(struct hash_elem he)
-{
-  struct frame_table_entry* fte = hash_entry(&he,struct frame_table_entry, hash_elem);
-  return hash_bytes(fte->uaddr, sizeof fte->uaddr);
-}
-
-bool
-compare_fte(struct hash_elem a, struct hash_elem b)
-{
-  const struct frame_table_entry* afte = hash_entry(&a, struct frame_table_entry, hash_elem);
-  const struct frame_table_entry* bfte = hash_entry(&b, struct frame_table_entry, hash_elem);
-  return afte->uaddr < bfte->uaddr ;
+  return evictfte;*/
 }

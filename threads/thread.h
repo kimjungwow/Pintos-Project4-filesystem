@@ -121,7 +121,8 @@ struct thread
     struct file* mmaptable[128];
     // struct list mmaplist;
     int nextmmapfd;
-    struct list framelist;
+    struct list perprocess_frame_list;
+
 
 #endif
 

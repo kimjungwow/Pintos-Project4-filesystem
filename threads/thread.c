@@ -469,7 +469,7 @@ init_thread (struct thread *t, const char *name, int priority)
     sema_init(&t->filesem,1);
     sema_init(&t->jinsem,0);
     t->loadsuccess=true;
-    list_init(&t->framelist);
+    list_init(&t->perprocess_frame_list);
   #endif
 }
 

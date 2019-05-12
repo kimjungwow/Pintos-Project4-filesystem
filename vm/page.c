@@ -96,6 +96,9 @@ before_munmap(struct sup_page_table_entry* spte)
       off_t temppos = file_tell(spte->file);
       off_t writebytes = file_write(spte->file,spte->user_vaddr, strlen((char *)spte->user_vaddr));
       file_seek(spte->file,temppos);
+
+
+      pagedir_set_dirty(thread_current()->pagedir,spte->user_vaddr,false);
       lock_release(&handlesem);
     }
   }
@@ -115,8 +118,6 @@ destroy_spt(void) // In fact, only munmap.
     struct sup_page_table_entry *spte = hash_entry (hash_cur (&i), struct sup_page_table_entry, hash_elem);
     before_munmap(spte);
     hash_next(&i);
-    // hash_delete(&thread_current()->hash,&spte->hash_elem);
-    // free(spte);
   }
 }
 
