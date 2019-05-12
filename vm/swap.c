@@ -116,7 +116,9 @@ palloc_free + pagedir 정리 + 해당 frame 메모리를 zero화 시켜서 전 �
 bool
 swap_out (void)
 {
+
   struct frame_table_entry* evictfte = select_fte_for_evict();
+  printf("NULL? %p\n",evictfte);
   size_t swapindex = bitmap_scan_and_flip (swap_table, 0,1,false);
   if (swapindex ==BITMAP_ERROR)
     return false;

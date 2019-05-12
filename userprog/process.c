@@ -185,36 +185,36 @@ process_exit (void)
 	/* Destroy the current process's page directory and switch back
 
 	   to the kernel-only page directory. */
+	if(!lock_held_by_current_thread(&framesem))
+		lock_acquire(&framesem);
+	if(curr->suppagetable!=NULL)
+	{
+		destroy_spt();
+		if(!list_empty(&curr->perprocess_frame_list))
+		{
+			struct list_elem* e;
+			for (e = list_begin (&curr->perprocess_frame_list); e != list_end (&curr->perprocess_frame_list); )
+			{
+				struct frame_table_entry *fte = list_entry (e, struct frame_table_entry, perprocess_list_elem);
+				e = list_next (e);
+				// pagedir_clear_page(curr->pagedir,fte->spte->user_vaddr);
 
- lock_acquire(&framesem);
- if(curr->suppagetable!=NULL)
- {
-    destroy_spt();
-    if(!list_empty(&curr->perprocess_frame_list))
-    {
-       struct list_elem* e;
-       for (e = list_begin (&curr->perprocess_frame_list); e != list_end (&curr->perprocess_frame_list); )
-       {
-          struct frame_table_entry *fte = list_entry (e, struct frame_table_entry, perprocess_list_elem);
-          e = list_next (e);
-					// pagedir_clear_page(curr->pagedir,fte->spte->user_vaddr);
+				// palloc_free_page(fte->frame);
+				list_remove(&fte->perprocess_list_elem);
+				list_remove(&fte->global_list_elem);
+				free(fte);
 
-          // palloc_free_page(fte->frame);
-          list_remove(&fte->perprocess_list_elem);
-          list_remove(&fte->global_list_elem);
-          free(fte);
+			}
+		}
+	}
 
-       }
-    }
- }
+	lock_release(&framesem);
 
- lock_release(&framesem);
-
- // Munmap!!
- // if(curr->suppagetable!=NULL)
- // {
- //    destroy_spt();
- // }
+	// Munmap!!
+	// if(curr->suppagetable!=NULL)
+	// {
+	//    destroy_spt();
+	// }
 
 	pd = curr->pagedir;
 	if (pd != NULL)

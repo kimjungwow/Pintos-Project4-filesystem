@@ -30,13 +30,13 @@ allocate_frame (void *uaddr, enum palloc_flags flags)
 
 
   uint32_t *frame = palloc_get_page(flags);
-  if(frame==NULL)
+  while(frame==NULL)
   {
     printf("Frame table full!\n");
     // lock_release(&framesem);
     // PANIC("FRAMETABLEFULL");
     swap_out();
-    return NULL;
+    frame=palloc_get_page(flags);
   }
   size_t i;
   struct frame_table_entry* newfte = (struct frame_table_entry*)calloc(1,sizeof(struct frame_table_entry));

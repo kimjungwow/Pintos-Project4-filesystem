@@ -158,7 +158,7 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-
+  // printf("fault_addr = %p\n",fault_addr);
   if(!user)
   {
     if(not_present)
@@ -303,7 +303,7 @@ page_fault (struct intr_frame *f)
           lock_release(&handlesem);
     			return;
     		}
-    		memset (kpage + page_read_bytes, 0, page_zero_bytes);
+    		// memset (kpage + page_read_bytes, 0, page_zero_bytes);
         pagedir_set_writable(thread_current()->pagedir,spte->user_vaddr,spte->writable);
         /*uint32_t* pte = lookup_page(thread_current()->pagedir,spte->user_vaddr,false);
         if(pte!=NULL)
