@@ -29,6 +29,7 @@ struct frame_table_entry
 
 	uint32_t* uaddr;
 	struct hash_elem hash_elem;
+	struct list_elem frame_elem;
 };
 /*
 void* get_frame(void);

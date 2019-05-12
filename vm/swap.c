@@ -15,6 +15,8 @@ static struct bitmap *swap_table;
 /* Protects swap_table */
 static struct lock swap_lock;
 
+struct lock framesem;
+
 /*
  * Initialize swap_device, swap_table, and swap_lock.
  */
@@ -82,7 +84,7 @@ swap_in (void *addr)
  */
 
  /*
- 0. 얘는 모든frame 사용중일때 호출. frame table의 hash_cnt==512일때?
+ 0. 얘는 모든frame 사용중일때 호출. palloc_get_page==NULL일때
 1. 정책을 정한 뒤 frame 사용중인 spte하나 고름
 2.
 (i) existing frame의 내용을 swap disk에 쓴다. 이 때 swap disk의 어느 주소에 쓰는지를
@@ -100,20 +102,19 @@ swap_out (void)
   size_t swapindex = bitmap_scan_and_flip (swap_table, 0,1,false);
   if (swapindex ==BITMAP_ERROR)
     return false;
-  write_to_disk(evictfte->frame, swapindex);
+  //다른 process의 frame도 evict가능? 그러면 여기서 pd는 해당 frame의 주인의 pd여야함.
+  pagedir_clear_page(evictfte->owner->pagedir,evictfte->spte->user_vaddr);
   evictfte->spte->swapindex=swapindex;
   evictfte->spte->inswap=true;
-  /*
-  free_page는 user_addr인가? physical인가?
-  palloc_free_page(evictfte->spte->user_vaddr);
-  다른 process의 frame도 evict가능? 그러면 여기서 pd는 해당 frame의 주인의 pd여야함.
-  pagedir_clear_page(thread_current()->pagedir,evictfte->spte->user_vaddr);*/
+  lock_release(&framesem);
+  write_to_disk(evictfte->frame, swapindex);
 
 
+  //free_page는 user_addr인가? physical인가? = physical(frame)
+  list_remove(&evictfte->frame_elem);
+  palloc_free_page(evictfte->frame);
 
-
-
-
+  free(evictfte);
   return true;
 }
 
@@ -123,7 +124,13 @@ swap_out (void)
  */
 void read_from_disk (uint8_t *frame, int index)
 {
-  //disk_read
+  int i, realindex=index*8;
+  for (i=0;i<8;i++)
+  {
+    disk_read(swap_device, realindex, frame);
+    realindex++;
+    frame+=DISK_SECTOR_SIZE;
+  }
   return;
 }
 //index 기준을 bitmap으로 생각.

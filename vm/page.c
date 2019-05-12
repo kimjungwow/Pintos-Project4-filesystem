@@ -36,7 +36,7 @@ allocate_page (struct file *file, off_t ofs, uint8_t *upage,
   if(myspte==NULL)
     return NULL;
   myspte->user_vaddr=(uint32_t *)upage;
-  myspte->access_time=(uint64_t)timer_ticks();
+  // myspte->access_time=(uint64_t)timer_ticks();
   myspte->mapid=0;
   myspte->mmapfd=0;
   myspte->inswap=false;

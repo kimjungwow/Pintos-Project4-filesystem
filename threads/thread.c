@@ -210,6 +210,7 @@ thread_create (const char *name, int priority,
     list_push_back(&thread_current()->childrenlist, &t->child_elem);
     t->wait=false;
 
+
   #endif
 
 
@@ -468,6 +469,7 @@ init_thread (struct thread *t, const char *name, int priority)
     sema_init(&t->filesem,1);
     sema_init(&t->jinsem,0);
     t->loadsuccess=true;
+    list_init(&t->framelist);
   #endif
 }
 

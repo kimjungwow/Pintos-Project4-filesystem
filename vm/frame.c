@@ -1,5 +1,6 @@
 #include "vm/frame.h"
 #include "vm/page.h"
+#include <list.h>
 extern struct pool user_pool;
 
 // struct frame_table_entry** frametable;
@@ -32,12 +33,14 @@ allocate_frame (void *uaddr, enum palloc_flags flags)
   if(frame==NULL)
   {
     printf("Frame table full!\n");
-    lock_release(&framesem);
-    PANIC("FRAMETABLEFULL");
+    // lock_release(&framesem);
+    // PANIC("FRAMETABLEFULL");
+    swap_out();
     return NULL;
   }
   size_t i;
-  struct frame_table_entry* newfte = (struct frame_table_entry*)malloc(sizeof(struct frame_table_entry));
+  struct frame_table_entry* newfte = (struct frame_table_entry*)calloc(1,sizeof(struct frame_table_entry));
+  // struct frame_table_entry* newfte = (struct frame_table_entry*)malloc(sizeof(struct frame_table_entry));
   newfte->frame = frame;
   newfte->owner = thread_current();
   newfte->uaddr = (uint32_t*)uaddr;
@@ -56,6 +59,7 @@ allocate_frame (void *uaddr, enum palloc_flags flags)
     if(pagedir_get_page (thread_current()->pagedir, uaddr) == NULL)
     {
       pagedir_set_page (thread_current()->pagedir, uaddr, frame, spte->writable);
+      list_push_back(&thread_current()->framelist,&newfte->frame_elem);
       lock_release(&framesem);
       return frame;
     }
