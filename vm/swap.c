@@ -64,6 +64,24 @@ swap_init (void)
 bool
 swap_in (void *addr)
 {
+   // * 1. Check that the page has been already evicted.
+  uint32_t* fault_addr = pg_round_down(addr);
+  struct sup_page_table_entry check;
+  struct hash_elem *he;
+  struct sup_page_table_entry* spte;
+  check.user_vaddr=fault_addr;
+  he= hash_find(&thread_current()->hash, &check.hash_elem);
+  spte = he !=NULL ? hash_entry(he, struct sup_page_table_entry, hash_elem) : NULL;
+  if(!spte->inswap)
+    return false;
+  lock_acquire(&framesem);
+  uint32_t* frame = allocate_frame(spte->user_vaddr,PAL_USER|PAL_ZERO);
+  while(frame==NULL)
+    frame = allocate_frame(spte->user_vaddr,PAL_USER|PAL_ZERO);
+
+  read_from_disk(frame,spte->swapindex);
+  spte->swapindex= -1;
+  spte->inswap=false;
 
   return true;
 }
