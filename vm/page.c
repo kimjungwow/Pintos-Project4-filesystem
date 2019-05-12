@@ -91,10 +91,13 @@ before_munmap(struct sup_page_table_entry* spte)
       void* target = (void *)((char *)spte->file + spte->ofs);
       lock_acquire(&handlesem);
       struct file* filetowrite = thread_current()->fdtable[spte->mmapfd];
-      off_t size = strlen((char *)spte->user_vaddr);
-      file_seek(spte->file,0);
+      // off_t size = strlen((char *)spte->user_vaddr);
+      // file_seek(spte->file,0);
       off_t temppos = file_tell(spte->file);
-      off_t writebytes = file_write(spte->file,spte->user_vaddr, strlen((char *)spte->user_vaddr));
+      // printf("BEFORE strlen | %p\n",spte->user_vaddr);
+      // file_seek(spte->file,spte->ofs);
+      off_t writebytes = file_write_at(spte->file,spte->user_vaddr, spte->read_bytes,spte->ofs);
+      // printf("AFTER strlen | %p\n",spte->user_vaddr);
       file_seek(spte->file,temppos);
 
 
@@ -113,9 +116,11 @@ destroy_spt(void) // In fact, only munmap.
   struct hash_iterator i;
   hash_first (&i, &curr->hash);
   hash_next(&i);
+
   while (hash_cur (&i))
   {
     struct sup_page_table_entry *spte = hash_entry (hash_cur (&i), struct sup_page_table_entry, hash_elem);
+
     before_munmap(spte);
     hash_next(&i);
   }

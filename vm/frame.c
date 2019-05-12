@@ -26,14 +26,11 @@ allocate_frame (void *uaddr, enum palloc_flags flags)
 {
   // printf("allocate_fram %p start\n",uaddr);
 
-  if(!lock_held_by_current_thread(&framesem))
-    lock_acquire(&framesem);
+  // if(!lock_held_by_current_thread(&framesem))
+  //   lock_acquire(&framesem);
   uint32_t *frame = palloc_get_page(flags);
   while(frame==NULL)
   {
-    // printf("Frame table full!\n");
-    // lock_release(&framesem);
-    // PANIC("FRAMETABLEFULL");
     swap_out();
     frame=palloc_get_page(flags);
   }
@@ -60,28 +57,28 @@ allocate_frame (void *uaddr, enum palloc_flags flags)
       pagedir_set_page (thread_current()->pagedir, uaddr, frame, spte->writable);
       list_push_back(&thread_current()->perprocess_frame_list,&newfte->perprocess_list_elem);
       list_push_back(&global_frame_list,&newfte->global_list_elem);
-      if(lock_held_by_current_thread(&framesem))
-        lock_release(&framesem);
+      // if(lock_held_by_current_thread(&framesem))
+      // lock_release(&framesem);
       // printf("allocate_fram %p end\n",uaddr);
       return frame;
     }
     else
     {
       palloc_free_page(frame);
-      lock_release(&framesem);
+      // lock_release(&framesem);
       return NULL;
     }
   }
   else{
     printf("FAIL TO FIND SPTE\n");
     palloc_free_page(frame);
-    lock_release(&framesem);
+    // lock_release(&framesem);
     return NULL;
   }
 
   printf("RUN OUT OF FRAME\n");
   palloc_free_page(frame);
-  lock_release(&framesem);
+  // lock_release(&framesem);
   return NULL;
 
 }
@@ -108,22 +105,7 @@ select_fte_for_evict(void)
         break;
       }
     }
+    pagedir_clear_page(fte->owner->pagedir,fte->spte->user_vaddr);
     return fte;
   }
-  /*
-  struct hash_iterator i;
-
-
-  hash_first (&i, &ftehash);
-  hash_next(&i);
-  struct frame_table_entry* evictfte = hash_entry (hash_cur (&i), struct frame_table_entry, hash_elem);
-  while (hash_cur (&i))
-  {
-    struct frame_table_entry *fte = hash_entry (hash_cur (&i), struct frame_table_entry, hash_elem);
-    if(fte->spte->access_time<evictfte->spte->access_time)
-      evictfte=fte;
-    hash_next(&i);
-
-  }
-  return evictfte;*/
 }

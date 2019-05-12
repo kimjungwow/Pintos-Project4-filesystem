@@ -185,8 +185,8 @@ process_exit (void)
 	/* Destroy the current process's page directory and switch back
 
 	   to the kernel-only page directory. */
-	if(!lock_held_by_current_thread(&framesem))
-		lock_acquire(&framesem);
+
+	lock_acquire(&framesem);
 	if(curr->suppagetable!=NULL)
 	{
 		destroy_spt();
@@ -581,7 +581,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 	ASSERT (pg_ofs (upage) == 0);
 	ASSERT (ofs % PGSIZE == 0);
 
-	file_seek (file, ofs);
+	// file_seek (file, ofs);
 	while (read_bytes > 0 || zero_bytes > 0)
 	{
 		/* Do calculate how to fill this page.
@@ -616,8 +616,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
 
 		/* Advance. */
-		allocate_page(file, ofs, upage, read_bytes, zero_bytes, writable);
-		ofs += page_read_bytes;
+		allocate_page(file, ofs, upage, page_read_bytes, page_zero_bytes, writable);
+		ofs += page_read_bytes + page_zero_bytes;
 		read_bytes -= page_read_bytes;
 		zero_bytes -= page_zero_bytes;
 		upage += PGSIZE;
@@ -644,7 +644,9 @@ setup_stack (void **esp, char* file_name)
 
 	allocate_page(NULL,0,((uint8_t *) PHYS_BASE) - PGSIZE,0,0,true);
 	//kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+	lock_acquire(&framesem);
 	kpage = allocate_frame (((uint8_t *) PHYS_BASE) - PGSIZE, PAL_USER | PAL_ZERO);
+	lock_release(&framesem);
 	if (kpage != NULL)
 	{
 		//success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);

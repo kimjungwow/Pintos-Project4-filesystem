@@ -13,6 +13,7 @@
 #include "threads/vaddr.h"
 #include "lib/kernel/hash.h"
 #include "threads/thread.h"
+#include "userprog/pagedir.h"
 
 struct list global_frame_list;
 extern struct lock handlesem;

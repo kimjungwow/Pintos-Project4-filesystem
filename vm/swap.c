@@ -17,6 +17,7 @@ static struct lock swap_lock;
 
 struct lock framesem;
 
+
 /*
  * Initialize swap_device, swap_table, and swap_lock.
  */
@@ -28,6 +29,7 @@ swap_init (void)
   swap_table = bitmap_create(disk_size(swap_device)/8);
 
   lock_init(&swap_lock);
+
 
   return;
 }
@@ -64,6 +66,8 @@ swap_init (void)
 bool
 swap_in (void *addr)
 {
+  lock_acquire(&swap_lock);
+
    // * 1. Check that the page has been already evicted.
   uint32_t* fault_addr = pg_round_down(addr);
   struct sup_page_table_entry check;
@@ -72,15 +76,16 @@ swap_in (void *addr)
   check.user_vaddr=fault_addr;
   he= hash_find(&thread_current()->hash, &check.hash_elem);
   spte = he !=NULL ? hash_entry(he, struct sup_page_table_entry, hash_elem) : NULL;
-  if(!spte->inswap)
-    return false;
+  // if(!spte->inswap)
+  //   return false;
+
+
   lock_acquire(&framesem);
+
   uint32_t* frame = allocate_frame(spte->user_vaddr,PAL_USER|PAL_ZERO);
-  /*
-  while(frame==NULL)
-  {
-    frame = allocate_frame(spte->user_vaddr,PAL_USER|PAL_ZERO);
-  }*/
+  lock_release(&framesem);
+
+
   if(frame==NULL)
     PANIC("frame is NULL\n");
 
@@ -88,6 +93,7 @@ swap_in (void *addr)
   bitmap_flip(swap_table,spte->swapindex);
   spte->swapindex= -1;
   spte->inswap=false;
+  lock_release(&swap_lock);
 
   return true;
 }
@@ -122,6 +128,12 @@ palloc_free + pagedir 정리 + 해당 frame 메모리를 zero화 시켜서 전 �
 bool
 swap_out (void)
 {
+  // bool check=false;
+  // if(!lock_held_by_current_thread(&swap_lock))
+  // {
+  //   lock_acquire(&swap_lock);
+  //   check=true;
+  // }
 
   struct frame_table_entry* evictfte = select_fte_for_evict();
   // printf("NULL? %p\n",evictfte);
@@ -132,7 +144,7 @@ swap_out (void)
     return false;
   }
   //다른 process의 frame도 evict가능? 그러면 여기서 pd는 해당 frame의 주인의 pd여야함.
-  pagedir_clear_page(evictfte->owner->pagedir,evictfte->spte->user_vaddr);
+  // pagedir_clear_page(evictfte->owner->pagedir,evictfte->spte->user_vaddr);
   evictfte->spte->swapindex=swapindex;
   evictfte->spte->inswap=true;
 
@@ -146,8 +158,9 @@ swap_out (void)
   palloc_free_page(evictfte->frame);
 
   free(evictfte);
-  if(lock_held_by_current_thread(&framesem))
-    lock_release(&framesem);
+  // if(check)
+  //   lock_release(&swap_lock);
+
   return true;
 }
 
