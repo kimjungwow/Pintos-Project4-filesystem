@@ -227,7 +227,8 @@ syscall_handler (struct intr_frame *f)
 			f->eax=-1;
 		}
 
-		if((get_user(*(uint8_t **)tempesp)==-1)||(*tempesp==NULL))
+		// if((get_user(*(uint8_t **)tempesp)==-1)||(*tempesp==NULL))
+		if(*(uint32_t **)tempesp==NULL)
 		{
 			thread_current()->returnstatus=-1;
 			thread_exit();

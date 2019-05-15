@@ -140,25 +140,6 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick ();
-  /*struct list* list = &thread_current()->framelist;
-  if (!list_empty(list)&&thread_current()->pagedir!=NULL)
-    {
-      struct list_elem *e;
-
-      for (e = list_begin (list); e != list_end (list);)
-      {
-        struct frame_table_entry *fte = list_entry (e, struct frame_table_entry, frame_elem);
-        if(pagedir_is_accessed(thread_current()->pagedir,fte->spte->user_vaddr))
-        {
-          fte->spte->access_time=(uint64_t)timer_ticks();
-          fte->spte->accessed=true;
-          pagedir_set_accessed(thread_current()->pagedir,fte->spte->user_vaddr,false);
-        }
-        e = e->next;
-      }
-    }*/
-  //timer_interrupt마다 현재 thread의 frame의 access bit들 check하자.
-  //accessbit이 설정된 애들은 access time을 지금 tick으로!
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

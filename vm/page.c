@@ -14,7 +14,6 @@ page_init (void)
   hash_init(&thread_current()->hash,hash_spte,compare_spte,NULL);
   thread_current()->next_mapid=3;
   thread_current()->nextmmapfd=3;
-  // list_init(&thread_current()->mmaplist);
   size_t i;
 }
 
