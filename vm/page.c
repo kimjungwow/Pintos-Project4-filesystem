@@ -1,4 +1,5 @@
 #include "vm/page.h"
+#include "vm/frame.h"
 extern struct pool user_pool;
 extern struct frame_table_entry** frametable;
 struct sup_page_table_entry** suppagetable;

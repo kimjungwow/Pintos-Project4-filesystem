@@ -8,7 +8,9 @@
 #include "lib/kernel/console.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
+
 #include "vm/page.h"
+
 #include "lib/kernel/hash.h"
 
 
@@ -226,7 +228,6 @@ syscall_handler (struct intr_frame *f)
 			thread_exit();
 			f->eax=-1;
 		}
-
 		// if((get_user(*(uint8_t **)tempesp)==-1)||(*tempesp==NULL))
 		if(*(uint32_t **)tempesp==NULL)
 		{

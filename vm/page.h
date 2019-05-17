@@ -11,7 +11,8 @@
 #include "threads/loader.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
-#include "vm/frame.h"
+#include <hash.h>
+
 #include "filesys/file.h"
 
 

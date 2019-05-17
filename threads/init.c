@@ -30,12 +30,15 @@
 #include "tests/threads/tests.h"
 #endif
 #ifdef FILESYS
+#include "devices/disk.h"
 #include "filesys/filesys.h"
 #include "filesys/fsutil.h"
 #endif
-#include "devices/disk.h"
+
 #include "vm/frame.h"
+#include "vm/page.h"
 #include "vm/swap.h"
+
 
 /* Amount of physical memory, in 4 kB pages. */
 size_t ram_pages;
@@ -92,6 +95,7 @@ main (void)
 
 
   frame_init ();
+  //page_init ();
 
 
   /* Segmentation. */
@@ -115,14 +119,13 @@ main (void)
   serial_init_queue ();
   timer_calibrate ();
 
-  // disk_init ();
 #ifdef FILESYS
   /* Initialize file system. */
   disk_init ();
   filesys_init (format_filesys);
 #endif
-
   swap_init();
+
   printf ("Boot complete.\n");
 
   /* Run actions specified on kernel command line. */
