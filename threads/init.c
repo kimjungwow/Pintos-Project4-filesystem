@@ -33,6 +33,7 @@
 #include "devices/disk.h"
 #include "filesys/filesys.h"
 #include "filesys/fsutil.h"
+#include "filesys/cache.h"
 #endif
 
 #include "vm/frame.h"
@@ -72,6 +73,7 @@ int
 main (void)
 {
   char **argv;
+  
 
   /* Clear BSS and get machine's RAM size. */
   ram_init ();
@@ -123,8 +125,10 @@ main (void)
   /* Initialize file system. */
   disk_init ();
   filesys_init (format_filesys);
+
 #endif
   swap_init();
+
 
   printf ("Boot complete.\n");
 
