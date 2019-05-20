@@ -7,6 +7,7 @@
 #include "filesys/inode.h"
 #include "filesys/directory.h"
 #include "devices/disk.h"
+#include "filesys/cache.h"
 
 /* The disk that contains the file system. */
 struct disk *filesys_disk;
@@ -36,6 +37,7 @@ filesys_init (bool format)
 void
 filesys_done (void)
 {
+  buffer_cache_write_dirties(filesys_disk);
   free_map_close ();
 }
 

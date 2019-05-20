@@ -630,7 +630,6 @@ syscall_handler (struct intr_frame *f)
 			struct sup_page_table_entry *spte = hash_entry (hash_cur (&i), struct sup_page_table_entry, hash_elem);
 			if((mapid_t)spte->mapid==mapid)
 			{
-
 				if(pagedir_is_dirty(thread_current()->pagedir,spte->user_vaddr))
 				{
 					spte_set_dirty(spte->user_vaddr,true);

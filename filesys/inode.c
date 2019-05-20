@@ -239,13 +239,13 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
         {
           /* Read sector into bounce buffer, then partially copy
              into caller's buffer. */
-
+/*
           if (bounce == NULL)
             {
               bounce = malloc (DISK_SECTOR_SIZE);
               if (bounce == NULL)
                 break;
-            }
+            }*/
           // disk_read (filesys_disk, sector_idx, bounce);
           // memcpy (buffer + bytes_read, bounce + sector_ofs, chunk_size);
           struct buffer_cache_entry *bce = buffer_cache_check(filesys_disk, sector_idx,false);
@@ -338,7 +338,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       bytes_written += chunk_size;
       // printf("SIZE = %d | off = %d | written = %d\n",size,offset,bytes_written);
     }
-  free (bounce);
+  // free (bounce);
 
   return bytes_written;
 }

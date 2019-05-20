@@ -12,6 +12,9 @@
 #include "vm/page.h"
 #include "vm/swap.h"
 
+#ifdef FILESYS
+#include "filesys/cache.h"
+#endif
 
 /* See [8254] for hardware details of the 8254 timer chip. */
 
@@ -141,6 +144,13 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
+  /*if(ticks%30==0)
+  {
+    enum intr_level old_level = intr_disable ();
+    buffer_cache_write_dirties();
+    intr_set_level (old_level);
+
+  }*/
   thread_tick ();
 }
 
