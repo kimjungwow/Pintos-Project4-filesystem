@@ -10,27 +10,6 @@ void buffer_cache_init(void) {
 
 }
 
-struct buffer_cache_entry* buffer_cache_find(struct disk *disk, disk_sector_t sec_no)
-{
-  lock_acquire(&buffersem);
-  struct list_elem *e;
-  if(!list_empty(&buffer_cache_list))
-  {
-    for (e = list_begin (&buffer_cache_list); e != list_end (&buffer_cache_list);
-         e = list_next (e))
-      {
-        struct buffer_cache_entry *buffer = list_entry (e, struct buffer_cache_entry, list_elem);
-        if(buffer->sec_no == sec_no)
-        {
-          lock_release(&buffersem);
-          return buffer;
-        }
-      }
-  }
-  lock_release(&buffersem);
-  return NULL;
-}
-
 struct buffer_cache_entry* buffer_cache_check(struct disk *disk, disk_sector_t sec_no, bool write)
 {
   lock_acquire(&buffersem);
@@ -65,6 +44,7 @@ struct buffer_cache_entry* buffer_cache_check(struct disk *disk, disk_sector_t s
     return NULL;
   }
   lock_init(&newbce->entry_lock);
+  lock_acquire(&newbce->entry_lock);
   cond_init(&newbce->entry_cond);
   newbce->sec_no = sec_no;
   list_push_back(&buffer_cache_list,&newbce->list_elem);
@@ -72,6 +52,7 @@ struct buffer_cache_entry* buffer_cache_check(struct disk *disk, disk_sector_t s
   // if(!write)
   disk_read(disk, sec_no, newbce->buffer);
   newbce->accessed=true;
+  lock_release(&newbce->entry_lock);
 
   // PANIC("HERE5\n");
   return newbce;

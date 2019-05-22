@@ -37,7 +37,6 @@ struct buffer_cache_entry
 void buffer_cache_init (void);
 struct buffer_cache_entry* buffer_cache_check(struct disk *disk, disk_sector_t sec_no, bool write);
 struct buffer_cache_entry* buffer_cache_write(struct disk *disk, disk_sector_t sec_no, void* towrite, off_t offset, size_t size);
-struct buffer_cache_entry* buffer_cache_find(struct disk *disk, disk_sector_t sec_no);
 void buffer_cache_write_dirties( struct disk *filesys_disk);
 struct buffer_cache_entry* select_bce_for_evict(void);
 void buffer_cache_write_dirties_once(struct disk *filesys_disk);
