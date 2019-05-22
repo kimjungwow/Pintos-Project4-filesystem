@@ -1,0 +1,393 @@
+#include "filesys/cache.h"
+#include "filesys/filesys.h"
+#include "devices/timer.h"
+disk_sector_t global_sec_no;
+
+void buffer_cache_init(void) {
+  list_init(&buffer_cache_list);
+  lock_init(&buffersem); //Need it
+  list_init(&read_ahead_list);
+  thread_create("writebehind",PRI_DEFAULT,buffer_cache_write_dirties, filesys_disk);
+  // thread_create("readahead",PRI_DEFAULT,buffer_cache_read_ahead, &read_ahead_list);
+
+  return;
+
+}
+
+struct buffer_cache_entry* buffer_cache_find(disk_sector_t sec_no)
+{
+  lock_acquire(&buffersem);
+  struct list_elem *e;
+  struct buffer_cache_entry *buffer = NULL;
+  if(!list_empty(&buffer_cache_list))
+  {
+    for (e = list_begin (&buffer_cache_list); e != list_end (&buffer_cache_list);
+         e = list_next (e))
+      {
+        buffer = list_entry (e, struct buffer_cache_entry, list_elem);
+        if(buffer->sec_no == sec_no)
+        {
+          break;
+        }
+      }
+  }
+  lock_release(&buffersem);
+  return buffer;
+}
+
+struct buffer_cache_entry* buffer_cache_check(struct disk *disk, disk_sector_t sec_no)
+{
+  lock_acquire(&buffersem);
+  struct list_elem *e;
+
+
+  if(!list_empty(&buffer_cache_list))
+  {
+    for (e = list_begin (&buffer_cache_list); e != list_end (&buffer_cache_list);
+         e = list_next (e))
+      {
+        struct buffer_cache_entry *buffer = list_entry (e, struct buffer_cache_entry, list_elem);
+        if(buffer->sec_no == sec_no)
+        {
+          buffer->accessed = true;
+          // printf("CHECK | sec_no(%u) === In list\n",sec_no);
+          lock_release(&buffersem);
+          global_sec_no=sec_no+1;
+          disk_sector_t *aux = malloc(sizeof (disk_sector_t));
+          /*if(aux==NULL)
+            return buffer;
+          *aux=sec_no+1;
+          if(sec_no<global_sec_no && global_sec_no< disk_size(filesys_disk) && !buffer->ahead)
+            thread_create("readahead",PRI_DEFAULT,buffer_cache_read_ahead,aux);*/
+          buffer->ahead=true;
+          buffer->readers=0;
+
+          return buffer;
+        }
+      }
+  }
+  if(list_size(&buffer_cache_list)>=64)
+  {
+    //Implement Clock Algorithm
+    struct buffer_cache_entry *victim = select_bce_for_evict();
+
+    if(victim->dirty)
+      disk_write (filesys_disk, victim->sec_no, victim->buffer);
+    list_remove(&victim->list_elem);
+    //Check dirty bit
+    free(victim);
+  }
+  struct buffer_cache_entry* newbce = (struct buffer_cache_entry*)calloc(1,sizeof (struct buffer_cache_entry));
+  if(newbce==NULL)
+  {
+    PANIC("1");
+    lock_release(&buffersem);
+    return NULL;
+  }
+  newbce->sec_no = sec_no;
+  lock_init(&newbce->entry_lock);
+  cond_init(&newbce->entry_cond);
+  list_push_back(&buffer_cache_list,&newbce->list_elem);
+  disk_read(disk, sec_no, newbce->buffer);
+  newbce->accessed=true;
+  // printf("CHECK | sec_no(%u) === Not in list\n",sec_no);
+  lock_release(&buffersem);
+  global_sec_no=sec_no+1;
+  disk_sector_t *aux = malloc(sizeof (disk_sector_t));
+  if(aux==NULL)
+    return newbce;
+  *aux=sec_no+1;
+  if(sec_no<global_sec_no && global_sec_no< disk_size(filesys_disk))
+    // thread_create("readahead",PRI_DEFAULT,buffer_cache_read_ahead, aux);
+  newbce->ahead=true;
+
+  return newbce;
+
+}
+
+// void
+// buffer_cache_read_ahead(void* aux)
+// {
+  /*
+  lock_acquire(&buffersem);
+  struct list_elem *e;
+  if(!list_empty(&read_ahead_list))
+  {
+    for (e = list_begin (&read_ahead_list); e != list_end (&read_ahead_list);
+         e = list_next (e))
+      {
+        // struct buffer_cache_entry *buffer = list_entry (e, struct buffer_cache_entry, list_elem);
+        // if(buffer->sec_no == sec_no)
+        // {
+        //   buffer->accessed = true;
+        //
+        //   lock_release(&buffersem);
+        //   return;
+        // }
+      }
+  }
+  lock_release(&buffersem);
+  return;*/
+  /*
+  lock_acquire(&buffersem);
+  // PANIC("ahead\n");
+  disk_sector_t sec_no = *(disk_sector_t *)aux;
+  free(aux);
+
+  // disk_sector_t sec_no = global_sec_no;
+
+
+  struct list_elem *e;
+  if(!list_empty(&buffer_cache_list))
+  {
+    for (e = list_begin (&buffer_cache_list); e != list_end (&buffer_cache_list);
+         e = list_next (e))
+      {
+        struct buffer_cache_entry *buffer = list_entry (e, struct buffer_cache_entry, list_elem);
+        if(buffer->sec_no == sec_no)
+        {
+          buffer->accessed = true;
+
+          // printf("AHEAD | sec_no(%u) === In list\n",sec_no);
+          lock_release(&buffersem);
+          return;
+        }
+      }
+  }
+
+  if(list_size(&buffer_cache_list)>=64)
+  {
+    struct buffer_cache_entry *victim = select_bce_for_evict();
+    if(victim->dirty)
+      disk_write (filesys_disk, victim->sec_no, victim->buffer);
+    list_remove(&victim->list_elem);
+    //Check dirty bit
+    free(victim);
+  }
+
+  struct buffer_cache_entry* newbce = (struct buffer_cache_entry*)calloc(1,sizeof (struct buffer_cache_entry));
+  if(newbce==NULL)
+  {
+    PANIC("1");
+    lock_release(&buffersem);
+    return;
+  }
+  newbce->sec_no = sec_no;
+  list_push_back(&buffer_cache_list,&newbce->list_elem);
+  // printf("AHEAD : sec_no(%u) | 1\n",sec_no);
+  disk_read(filesys_disk, sec_no, newbce->buffer);
+  // printf("AHEAD : sec_no(%u) | 2\n",sec_no);
+  newbce->accessed=true;
+  // printf("AHEAD | sec_no(%u) === Not in list\n",sec_no);
+
+
+  lock_release(&buffersem);*/
+//   return;
+// }
+
+
+
+struct buffer_cache_entry*
+buffer_cache_write(struct disk *disk, disk_sector_t sec_no, void* towrite
+  , off_t offset, size_t size)
+{
+  // struct buffer_cache_entry* bce = buffer_cache_check(disk, sec_no);
+  // lock_acquire(&buffersem);
+  printf("Write_secno(%d)\n",sec_no);
+
+
+  struct buffer_cache_entry* bce = buffer_cache_find(sec_no);
+  if(bce == NULL)
+  {
+    lock_acquire(&buffersem);
+    if(buffer_cache_full())
+    {
+      //Select victim and remove victim from list
+      struct buffer_cache_entry *victim = select_bce_for_evict();
+
+      lock_acquire(&victim->entry_lock);
+      //Write behind and free
+      if(buffer_cache_include(victim->sec_no) && victim->dirty)
+        disk_write(filesys_disk,victim->sec_no,victim->buffer);
+      lock_release(&victim->entry_lock);
+    }
+        //Make new one
+    bce = (struct buffer_cache_entry*)calloc(1,sizeof (struct buffer_cache_entry));
+    if(bce==NULL)
+    {
+      lock_release(&buffersem);
+      return;
+    }
+
+    lock_init(&bce->entry_lock);
+    cond_init(&bce->entry_cond);
+
+    lock_acquire(&bce->entry_lock);
+    bce->initdone=false;
+    bce->sec_no = sec_no;
+    bce->readers=0;
+    list_push_back(&buffer_cache_list,&bce->list_elem);
+    lock_release(&buffersem);
+
+
+    disk_read(filesys_disk, sec_no, bce->buffer);
+    lock_release(&bce->entry_lock);
+
+  }
+  lock_acquire(&bce->entry_lock);
+  while(bce->readers>0)
+    cond_wait(&bce->entry_cond,&bce->entry_lock);
+  // printf("WRITE#################\n");
+  memcpy(bce->buffer+offset,towrite, size);
+  bce->dirty=true;
+  // lock_release(&buffersem);
+  lock_release(&bce->entry_lock);
+
+}
+
+bool
+buffer_cache_full(void)
+{
+  return !list_empty(&buffer_cache_list) && list_size(&buffer_cache_list) >= BUFFER_CACHE_SIZE;
+}
+
+bool
+buffer_cache_include(disk_sector_t sec_no)
+{
+  struct list_elem *e;
+  if(!list_empty(&buffer_cache_list))
+  {
+    for (e = list_begin (&buffer_cache_list); e != list_end (&buffer_cache_list);
+         e = list_next (e))
+      {
+        struct buffer_cache_entry *buffer = list_entry (e, struct buffer_cache_entry, list_elem);
+        if(buffer->sec_no==sec_no)
+          return true;
+      }
+  }
+  return false;
+}
+
+
+
+void
+buffer_cache_write_dirties(struct disk *filesys_disk)
+{
+  while(true)
+  {
+    timer_sleep(20000);
+    buffer_cache_write_dirties_once(filesys_disk);
+  }
+  return;
+}
+
+
+void
+buffer_cache_write_dirties_once(struct disk *filesys_disk)
+{
+
+  struct list_elem *e;
+  if(!list_empty(&buffer_cache_list))
+  {
+    for (e = list_begin (&buffer_cache_list); e != list_end (&buffer_cache_list);
+         e = list_next (e))
+      {
+        struct buffer_cache_entry *buffer = list_entry (e, struct buffer_cache_entry, list_elem);
+        lock_acquire(&buffer->entry_lock);
+        if(buffer->dirty)
+        {
+          disk_write (filesys_disk, buffer->sec_no, buffer->buffer);
+          buffer->dirty=false;
+          lock_release(&buffer->entry_lock);
+        }
+      }
+  }
+
+  return;
+}
+
+struct buffer_cache_entry*
+select_bce_for_evict(void)
+{
+  lock_acquire(&buffersem);
+
+  struct list_elem* e;
+  struct buffer_cache_entry *bce=NULL;
+  while(true)
+  {
+    e = list_begin (&buffer_cache_list);
+    bce = list_entry (e, struct buffer_cache_entry, list_elem);
+    lock_acquire(&bce->entry_lock);
+    if(bce->accessed)
+    {
+      bce->accessed=false;
+      list_remove(&bce->list_elem);
+      list_push_back(&buffer_cache_list,&bce->list_elem);
+      lock_release(&bce->entry_lock);
+    }
+    else
+      break;
+  }
+  list_remove(&bce->list_elem);
+  lock_release(&bce->entry_lock);
+  lock_release(&buffersem);
+
+  return bce;
+
+}
+
+void buffer_cache_read_at(disk_sector_t sec_no, void* dst, off_t offset , size_t size) {
+  struct buffer_cache_entry* bce = buffer_cache_find(sec_no);
+  // printf("READ secno(%d)\n",sec_no);
+  if(bce == NULL)
+  {
+    lock_acquire(&buffersem);
+    if(buffer_cache_full())
+    {
+      //Select victim and remove victim from list
+      struct buffer_cache_entry *victim = select_bce_for_evict();
+
+      lock_acquire(&victim->entry_lock);
+      //Write behind and free
+      if(buffer_cache_include(victim->sec_no) && victim->dirty)
+        disk_write(filesys_disk,victim->sec_no,victim->buffer);
+      lock_release(&victim->entry_lock);
+    }
+        //Make new one
+    bce = (struct buffer_cache_entry*)calloc(1,sizeof (struct buffer_cache_entry));
+    if(bce==NULL)
+    {
+      lock_release(&buffersem);
+      return;
+    }
+
+    lock_init(&bce->entry_lock);
+    cond_init(&bce->entry_cond);
+
+    lock_acquire(&bce->entry_lock);
+    bce->initdone=false;
+    bce->sec_no = sec_no;
+    bce->readers=0;
+    list_push_back(&buffer_cache_list,&bce->list_elem);
+    lock_release(&buffersem);
+
+
+    disk_read(filesys_disk, sec_no, bce->buffer);
+    lock_release(&bce->entry_lock);
+
+  }
+  lock_acquire(&bce->entry_lock);
+  bce->accessed=true;
+  bce->readers++;
+  lock_release(&bce->entry_lock);
+  memcpy(dst,bce->buffer+offset,size);
+  lock_acquire(&bce->entry_lock);
+  bce->readers--;
+  if(bce->readers==0)
+    cond_broadcast(&bce->entry_cond,&bce->entry_lock);
+  lock_release(&bce->entry_lock);
+
+
+  printf("END READ\n");
+
+}

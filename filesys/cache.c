@@ -1,14 +1,17 @@
 #include "filesys/cache.h"
 #include "filesys/filesys.h"
 #include "devices/timer.h"
+#include "threads/thread.h"
 
 void buffer_cache_init(void) {
   list_init(&buffer_cache_list);
   lock_init(&buffersem); //Need it
   thread_create("writebehind",PRI_DEFAULT,buffer_cache_write_dirties, filesys_disk);
+  // thread_create("readahead",PRI_DEFAULT,buffer_cache_read_ahead,filesys_disk);
   return;
 
 }
+
 
 struct buffer_cache_entry* buffer_cache_check(struct disk *disk, disk_sector_t sec_no, bool write)
 {
@@ -53,6 +56,9 @@ struct buffer_cache_entry* buffer_cache_check(struct disk *disk, disk_sector_t s
   disk_read(disk, sec_no, newbce->buffer);
   newbce->accessed=true;
   lock_release(&newbce->entry_lock);
+
+  if(write)
+    buffer_cache_check(disk,sec_no+1,false);
 
   // PANIC("HERE5\n");
   return newbce;

@@ -15,6 +15,7 @@
 
 struct list buffer_cache_list;
 struct lock buffersem;
+struct list read_ahead_list;
 
 #ifndef FILESYS_CACHE_H
 #define FILESYS_CACHE_H
@@ -34,10 +35,17 @@ struct buffer_cache_entry
 	struct condition entry_cond;
 };
 
+struct read_ahead_entry
+{
+	disk_sector_t sec_no;
+	struct list_elem read_ahead_elem;
+};
+
 void buffer_cache_init (void);
 struct buffer_cache_entry* buffer_cache_check(struct disk *disk, disk_sector_t sec_no, bool write);
 struct buffer_cache_entry* buffer_cache_write(struct disk *disk, disk_sector_t sec_no, void* towrite, off_t offset, size_t size);
 void buffer_cache_write_dirties( struct disk *filesys_disk);
 struct buffer_cache_entry* select_bce_for_evict(void);
 void buffer_cache_write_dirties_once(struct disk *filesys_disk);
+bool buffer_cache_find(struct disk *disk, disk_sector_t sec_no);
 #endif /* filesys/cache.h */

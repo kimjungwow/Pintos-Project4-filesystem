@@ -236,7 +236,7 @@ process_exit (void)
 
 	if(strcmp(curr->name,"main")!=0)
 	{
-		if(strcmp(curr->name,"writebehind")!=0)
+		if(strcmp(curr->name,"readahead")!=0&&strcmp(curr->name,"writebehind")!=0 )
 			printf("%s: exit(%d)\n",curr->name,curr->returnstatus);
 
 		sema_up(&curr->waitsem);
