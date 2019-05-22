@@ -37,7 +37,7 @@ filesys_init (bool format)
 void
 filesys_done (void)
 {
-  buffer_cache_write_dirties(filesys_disk);
+  buffer_cache_write_dirties_once(filesys_disk);
   free_map_close ();
 }
 

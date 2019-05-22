@@ -144,7 +144,17 @@ inode_open (disk_sector_t sector)
   struct buffer_cache_entry *bce = buffer_cache_check(filesys_disk, inode->sector,false);
   // PANIC("bce %p",bce);
   if(bce!=NULL&&bce->buffer!=NULL)
-    memcpy(&inode->data,bce->buffer,DISK_SECTOR_SIZE);
+    {
+      lock_acquire(&bce->entry_lock);
+      bce->readers++;
+      lock_release(&bce->entry_lock);
+      memcpy(&inode->data,bce->buffer,DISK_SECTOR_SIZE);
+      lock_acquire(&bce->entry_lock);
+      bce->readers--;
+      if(bce->readers==0)
+        cond_broadcast(&bce->entry_cond,&bce->entry_lock);
+      lock_release(&bce->entry_lock);
+    }
   return inode;
 }
 
@@ -233,7 +243,17 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
            // disk_read (filesys_disk, sector_idx, buffer + bytes_read);
           struct buffer_cache_entry *bce = buffer_cache_check(filesys_disk, sector_idx,false);
           if(bce!=NULL&&bce->buffer!=NULL)
+          {
+            lock_acquire(&bce->entry_lock);
+            bce->readers++;
+            lock_release(&bce->entry_lock);
             memcpy(buffer+bytes_read,bce->buffer,DISK_SECTOR_SIZE);
+            lock_acquire(&bce->entry_lock);
+            bce->readers--;
+            if(bce->readers==0)
+              cond_broadcast(&bce->entry_cond,&bce->entry_lock);
+            lock_release(&bce->entry_lock);
+          }
         }
       else
         {
@@ -250,7 +270,20 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
           // memcpy (buffer + bytes_read, bounce + sector_ofs, chunk_size);
           struct buffer_cache_entry *bce = buffer_cache_check(filesys_disk, sector_idx,false);
           if(bce!=NULL&&bce->buffer!=NULL)
+          {
+            lock_acquire(&bce->entry_lock);
+            bce->readers++;
+            lock_release(&bce->entry_lock);
+
+
             memcpy (buffer + bytes_read, bce->buffer + sector_ofs, chunk_size);
+            lock_acquire(&bce->entry_lock);
+            bce->readers--;
+            if(bce->readers==0)
+              cond_broadcast(&bce->entry_cond,&bce->entry_lock);
+            lock_release(&bce->entry_lock);
+
+          }
         }
 
       /* Advance. */
