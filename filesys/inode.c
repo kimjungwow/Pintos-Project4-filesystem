@@ -7,6 +7,7 @@
 #include "filesys/free-map.h"
 #include "threads/malloc.h"
 #include "filesys/cache.h"
+#include "threads/thread.h"
 
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
@@ -458,15 +459,35 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 
       /* Bytes left in inode, bytes left in sector, lesser of the two. */
       off_t inode_left = inode_length (inode) - offset;
+      if(inode_left==0)
+      {
+        int growth = size < DISK_SECTOR_SIZE ? size : DISK_SECTOR_SIZE;
+        // if(strcmp(thread_current()->name,"main")!=0)
+        //   printf("GROWTH! %d\n",growth);
+        inode_grow(inode->sector,&inode->data,growth);
+        inode_left = inode_length (inode) - sector_ofs;
+
+      }
       int sector_left = DISK_SECTOR_SIZE - sector_ofs;
       int min_left = inode_left < sector_left ? inode_left : sector_left;
 
       /* Number of bytes to actually write into this sector. */
       int chunk_size = size < min_left ? size : min_left;
-      // printf("buffer_cache_write : chunk_size = %d | size = %d | ofs = %d | inode_left = %d\n",chunk_size,size,sector_ofs,inode_left);
+
       disk_sector_t sector_idx = byte_to_sector (inode, offset+chunk_size);
+      // if(strcmp(thread_current()->name,"main")!=0)
+      //   printf("sector index = %u | first = %u | off = %d | length = %u\n",sector_idx,inode->data.start[0],offset+chunk_size,inode->data.length);
       if (chunk_size <= 0)
+      {
+        // if(strcmp(thread_current()->name,"main")!=0)
+        //   printf("\n\nchunk_size is zero...\n\nsize=%d | min_left=%d|inode_left=%d|sector_left=%d\n",size,min_left,inode_left,sector_left);
         break;
+      }
+
+
+      // if(strcmp(thread_current()->name,"main")!=0)
+      //   printf("WRITE : sector_idx = %u |chunk_size = %d | size = %d | ofs = %d | inode_left = %d\n",sector_idx,chunk_size,size,sector_ofs,inode_left);
+
       buffer_cache_write(filesys_disk, sector_idx, buffer+bytes_written,sector_ofs,chunk_size);
       // printf("OUT#############W\n");
       // if (sector_ofs == 0 && chunk_size == DISK_SECTOR_SIZE)

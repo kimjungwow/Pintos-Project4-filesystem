@@ -294,12 +294,10 @@ syscall_handler (struct intr_frame *f)
 			filesize = -1;
 		else
 		{
-
 			lock_acquire(&handlesem);
 			filesize = (int)(file_length(filetoread));
 			lock_release(&handlesem);
 		}
-
 		f->eax=filesize;
 		barrier();
 		break;
