@@ -13,20 +13,20 @@
 
 /* On-disk inode.
    Must be exactly DISK_SECTOR_SIZE bytes long. */
-struct inode_disk
-  {
-    // disk_sector_t start;                /* First data sector. */
-    off_t length;                       /* File size in bytes. */
-    unsigned magic;                     /* Magic number. */
-    disk_sector_t start;                /* First data sector. */
-    disk_sector_t unused[123];               /* Not used. */
-    // uint32_t unused[123];               /* Not used. */
-    disk_sector_t* indirect; //Pointer has same size with uint32_t
-    disk_sector_t** doubly_indirect; //Pointer has same size with  uint32_t
-
-
-    // uint32_t unused[125];               /* Not used. */
-  };
+// struct inode_disk
+//   {
+//     // disk_sector_t start;                /* First data sector. */
+//     off_t length;                       /* File size in bytes. */
+//     unsigned magic;                     /* Magic number. */
+//     disk_sector_t start[124];                /* First data sector. */
+//     // disk_sector_t unused[123];               /* Not used. */
+//
+//     disk_sector_t* indirect; //Pointer has same size with uint32_t
+//     disk_sector_t** doubly_indirect; //Pointer has same size with  uint32_t
+//
+//
+//     // uint32_t unused[125];               /* Not used. */
+//   };
 
 /* Returns the number of sectors to allocate for an inode SIZE
    bytes long. */
@@ -55,10 +55,33 @@ static disk_sector_t
 byte_to_sector (const struct inode *inode, off_t pos)
 {
   ASSERT (inode != NULL);
-  if (pos < inode->data.length)
+  inode_grow(inode->sector,&inode->data,pos);
+  size_t currentsectors = bytes_to_sectors(inode->data.length);
+  size_t targetsector = bytes_to_sectors(pos);
+  if(pos==0)
+  {
+    return *(inode->data.start);
+  }
+  else if(currentsectors<124)
+  {
+    // printf("\nNow less than 124!!!\nReturn : %u | target sector is %u with position %u\n Because start is %u\n",*(inode->data.start+targetsector-1),targetsector,pos,*(inode->data.start));
+    return *(inode->data.start+targetsector-1);
+  }
+  else if (currentsectors<DISK_SECTOR_SIZE)
+  {
+    // printf("\nNow less than 512!!!\n\n");
+    return *(inode->data.indirect+targetsector-1);
+  }
+  else if(currentsectors<DISK_SECTOR_SIZE*DISK_SECTOR_SIZE)
+    PANIC("test case please not here\n");
+  else
+    PANIC("File size should be smaller than disk size(%d Bytes)\n",DISK_SECTOR_SIZE*disk_size(filesys_disk));
+  printf("\nNot implemented!!!\n\n");
+  return -1;
+  /*if (pos < inode->data.length)
     return inode->data.start + pos / DISK_SECTOR_SIZE;
   else
-    return -1;
+    return -1;*/
 }
 
 /* List of open inodes, so that opening a single inode twice
@@ -77,7 +100,7 @@ inode_grow(disk_sector_t sector, struct inode_disk* disk_inode, off_t length)
 {
   //If don't need to grow
   if(disk_inode->length>=length)
-    return false;
+    return true;
 
   //If file size is bigger than disk size
   if(length>DISK_SECTOR_SIZE*disk_size(filesys_disk)) // 아직 metadata 용량 못뺌
@@ -88,14 +111,18 @@ inode_grow(disk_sector_t sector, struct inode_disk* disk_inode, off_t length)
   size_t neededsectors = bytes_to_sectors(length);
   size_t currentsectors = bytes_to_sectors(disk_inode->length);
   int i;
+  // disk_sector_t* zerobuffer = calloc(1,DISK_SECTOR_SIZE);
+  static char zeros[DISK_SECTOR_SIZE];
+
   if(neededsectors<=124)
   {
     // Use direct pointer
-
     for (i=currentsectors;i<neededsectors;i++)
     {
-      if (!free_map_allocate (1, &(disk_inode->start+i)))
-        PANIC("Fail to allocate free map.\n");
+      if (!free_map_allocate (1, disk_inode->start+i))
+        PANIC("Fail to allocate free map.\n"); // Fail to allocate
+      else
+        buffer_cache_write(filesys_disk,disk_inode->start[i],zeros,0,DISK_SECTOR_SIZE);// Success to allocate -> make all value zero
     }
   }
   else if (neededsectors<=DISK_SECTOR_SIZE)
@@ -108,14 +135,18 @@ inode_grow(disk_sector_t sector, struct inode_disk* disk_inode, off_t length)
     }
     for (i=currentsectors;i<neededsectors;i++)
     {
-      if (!free_map_allocate (1, &(disk_inode->indirect+i)))
-        PANIC("Fail to allocate free map.\n");
+      if (!free_map_allocate (1, disk_inode->indirect+i))
+        PANIC("Fail to allocate free map.\n"); // Fail to allocate
+      else
+        buffer_cache_write(filesys_disk,*(disk_inode->indirect+i),zeros,0,DISK_SECTOR_SIZE);// Success to allocate -> make all value zero
+
     }
 
 
   }
   else if (neededsectors<=DISK_SECTOR_SIZE*DISK_SECTOR_SIZE)
   {
+    PANIC("Hope testcase is not here. Not yet.\n");
     //Use doubly-indirect pointer
     if(disk_inode->doubly_indirect==NULL)
     {
@@ -128,9 +159,10 @@ inode_grow(disk_sector_t sector, struct inode_disk* disk_inode, off_t length)
     PANIC("File size should be smaller than disk size(%d Bytes)\n",DISK_SECTOR_SIZE*disk_size(filesys_disk));
     return false;
   }
-
+  disk_inode->length = length;
+  // printf("inode grow from %d to %d sectors!\n",currentsectors,neededsectors);
+  buffer_cache_write(filesys_disk, sector, disk_inode,0,DISK_SECTOR_SIZE);
   return true;
-
 
 }
 
@@ -156,28 +188,31 @@ inode_create (disk_sector_t sector, off_t length)
   if (disk_inode != NULL)
     {
       size_t sectors = bytes_to_sectors (length);
-      disk_inode->length = length;
+      disk_inode->length = 0;
+      // disk_inode->length = length;
       disk_inode->magic = INODE_MAGIC;
 
 
-
-      if (free_map_allocate (sectors, &disk_inode->start))
+      // if (free_map_allocate (sectors, &disk_inode->start))
+      if (inode_grow(sector,disk_inode,length))
         {
           // disk_write (filesys_disk, sector, disk_inode);
           buffer_cache_write(filesys_disk, sector, disk_inode,0,DISK_SECTOR_SIZE);
 
 
           // Below if isn't needed at start with size 0.
-
+/*
           if (sectors > 0)
             {
               static char zeros[DISK_SECTOR_SIZE];
               size_t i;
 
               for (i = 0; i < sectors; i++)
-                buffer_cache_write(filesys_disk, disk_inode->start+i, zeros,0,DISK_SECTOR_SIZE);
+                buffer_cache_write(filesys_disk, *(disk_inode->start+i), zeros,0,DISK_SECTOR_SIZE);
+                // buffer_cache_write(filesys_disk, disk_inode->start+i, zeros,0,DISK_SECTOR_SIZE);
                 // disk_write (filesys_disk, disk_inode->start + i, zeros);
-            }
+            }*/
+
 
           success = true;
         }
@@ -274,8 +309,27 @@ inode_close (struct inode *inode)
       if (inode->removed)
         {
           free_map_release (inode->sector, 1);
-          free_map_release (inode->data.start,
-                            bytes_to_sectors (inode->data.length));
+
+          size_t currentsectors = bytes_to_sectors(inode->data.length);
+          if(currentsectors<124)
+          {
+            int i;
+            for (i=0;i<currentsectors;i++)
+            {
+              free_map_release (inode->data.start[i],
+                                1);
+            }
+
+          }
+          else
+          {
+            PANIC("NOt yet\n");
+          }
+
+
+
+          // free_map_release (inode->data.start,
+          //                   bytes_to_sectors (inode->data.length));
         }
 
       free (inode);
@@ -299,12 +353,12 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
 {
   uint8_t *buffer = buffer_;
   off_t bytes_read = 0;
-  uint8_t *bounce = NULL;
+  // uint8_t *bounce = NULL;
 
   while (size > 0)
     {
       /* Disk sector to read, starting byte offset within sector. */
-      disk_sector_t sector_idx = byte_to_sector (inode, offset);
+      // disk_sector_t sector_idx = byte_to_sector (inode, offset);
       int sector_ofs = offset % DISK_SECTOR_SIZE;
 
       /* Bytes left in inode, bytes left in sector, lesser of the two. */
@@ -316,6 +370,7 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
       int chunk_size = size < min_left ? size : min_left;
       if (chunk_size <= 0)
         break;
+      disk_sector_t sector_idx = byte_to_sector (inode, offset+chunk_size);
 
       if (sector_ofs == 0 && chunk_size == DISK_SECTOR_SIZE)
         {
@@ -371,7 +426,7 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
       offset += chunk_size;
       bytes_read += chunk_size;
     }
-  free (bounce);
+  // free (bounce);
 
   return bytes_read;
 }
@@ -397,7 +452,8 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
     {
       // printf("In Inode size = %d\n",size);
       /* Sector to write, starting byte offset within sector. */
-      disk_sector_t sector_idx = byte_to_sector (inode, offset);
+
+      // disk_sector_t sector_idx = byte_to_sector (inode, offset);
       int sector_ofs = offset % DISK_SECTOR_SIZE;
 
       /* Bytes left in inode, bytes left in sector, lesser of the two. */
@@ -408,6 +464,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       /* Number of bytes to actually write into this sector. */
       int chunk_size = size < min_left ? size : min_left;
       // printf("buffer_cache_write : chunk_size = %d | size = %d | ofs = %d | inode_left = %d\n",chunk_size,size,sector_ofs,inode_left);
+      disk_sector_t sector_idx = byte_to_sector (inode, offset+chunk_size);
       if (chunk_size <= 0)
         break;
       buffer_cache_write(filesys_disk, sector_idx, buffer+bytes_written,sector_ofs,chunk_size);

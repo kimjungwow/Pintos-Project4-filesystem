@@ -70,6 +70,7 @@ struct buffer_cache_entry*
 buffer_cache_write(struct disk *disk, disk_sector_t sec_no, void* towrite
   , off_t offset, size_t size)
 {
+  // printf("required sec_no (%u) | disk capacity (%u)\n",sec_no,disk_size(disk));
   struct buffer_cache_entry* bce = buffer_cache_check(disk, sec_no,true);
   // lock_acquire(&buffersem);
   lock_acquire(&bce->entry_lock);
