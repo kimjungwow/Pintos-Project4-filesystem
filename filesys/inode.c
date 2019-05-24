@@ -15,10 +15,17 @@
    Must be exactly DISK_SECTOR_SIZE bytes long. */
 struct inode_disk
   {
-    disk_sector_t start;                /* First data sector. */
+    // disk_sector_t start;                /* First data sector. */
     off_t length;                       /* File size in bytes. */
     unsigned magic;                     /* Magic number. */
-    uint32_t unused[125];               /* Not used. */
+    disk_sector_t start;                /* First data sector. */
+    disk_sector_t unused[123];               /* Not used. */
+    // uint32_t unused[123];               /* Not used. */
+    disk_sector_t* indirect; //Pointer has same size with uint32_t
+    disk_sector_t** doubly_indirect; //Pointer has same size with  uint32_t
+
+
+    // uint32_t unused[125];               /* Not used. */
   };
 
 /* Returns the number of sectors to allocate for an inode SIZE
@@ -65,6 +72,69 @@ inode_init (void)
   list_init (&open_inodes);
 }
 
+bool
+inode_grow(disk_sector_t sector, struct inode_disk* disk_inode, off_t length)
+{
+  //If don't need to grow
+  if(disk_inode->length>=length)
+    return false;
+
+  //If file size is bigger than disk size
+  if(length>DISK_SECTOR_SIZE*disk_size(filesys_disk)) // 아직 metadata 용량 못뺌
+  {
+    PANIC("File size should be smaller than disk size(%d Bytes)\n",DISK_SECTOR_SIZE*disk_size(filesys_disk));
+    return false;
+  }
+  size_t neededsectors = bytes_to_sectors(length);
+  size_t currentsectors = bytes_to_sectors(disk_inode->length);
+  int i;
+  if(neededsectors<=124)
+  {
+    // Use direct pointer
+
+    for (i=currentsectors;i<neededsectors;i++)
+    {
+      if (!free_map_allocate (1, &(disk_inode->start+i)))
+        PANIC("Fail to allocate free map.\n");
+    }
+  }
+  else if (neededsectors<=DISK_SECTOR_SIZE)
+  {
+    //Use indirect pointer
+    if(disk_inode->indirect==NULL)
+    {
+      disk_inode->indirect = (disk_sector_t*)calloc(DISK_SECTOR_SIZE,sizeof (disk_sector_t));
+      memcpy(disk_inode->indirect,disk_inode->start,currentsectors*(sizeof (disk_sector_t)));
+    }
+    for (i=currentsectors;i<neededsectors;i++)
+    {
+      if (!free_map_allocate (1, &(disk_inode->indirect+i)))
+        PANIC("Fail to allocate free map.\n");
+    }
+
+
+  }
+  else if (neededsectors<=DISK_SECTOR_SIZE*DISK_SECTOR_SIZE)
+  {
+    //Use doubly-indirect pointer
+    if(disk_inode->doubly_indirect==NULL)
+    {
+      disk_inode->doubly_indirect = (disk_sector_t*)calloc(DISK_SECTOR_SIZE,sizeof (disk_sector_t*));
+    }
+  }
+  else
+  {
+    NOT_REACHED();
+    PANIC("File size should be smaller than disk size(%d Bytes)\n",DISK_SECTOR_SIZE*disk_size(filesys_disk));
+    return false;
+  }
+
+  return true;
+
+
+}
+
+
 /* Initializes an inode with LENGTH bytes of data and
    writes the new inode to sector SECTOR on the file system
    disk.
@@ -88,10 +158,17 @@ inode_create (disk_sector_t sector, off_t length)
       size_t sectors = bytes_to_sectors (length);
       disk_inode->length = length;
       disk_inode->magic = INODE_MAGIC;
+
+
+
       if (free_map_allocate (sectors, &disk_inode->start))
         {
           // disk_write (filesys_disk, sector, disk_inode);
           buffer_cache_write(filesys_disk, sector, disk_inode,0,DISK_SECTOR_SIZE);
+
+
+          // Below if isn't needed at start with size 0.
+
           if (sectors > 0)
             {
               static char zeros[DISK_SECTOR_SIZE];
@@ -101,8 +178,11 @@ inode_create (disk_sector_t sector, off_t length)
                 buffer_cache_write(filesys_disk, disk_inode->start+i, zeros,0,DISK_SECTOR_SIZE);
                 // disk_write (filesys_disk, disk_inode->start + i, zeros);
             }
+
           success = true;
         }
+
+
       free (disk_inode);
     }
   return success;
@@ -241,7 +321,7 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
         {
           /* Read full sector directly into caller's buffer. */
            // disk_read (filesys_disk, sector_idx, buffer + bytes_read);
-          struct buffer_cache_entry *bce = buffer_cache_check(filesys_disk, sector_idx,false);
+          struct buffer_cache_entry *bce = buffer_cache_check(filesys_disk, sector_idx,true);
           if(bce!=NULL&&bce->buffer!=NULL)
           {
             lock_acquire(&bce->entry_lock);
@@ -268,7 +348,7 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
             }*/
           // disk_read (filesys_disk, sector_idx, bounce);
           // memcpy (buffer + bytes_read, bounce + sector_ofs, chunk_size);
-          struct buffer_cache_entry *bce = buffer_cache_check(filesys_disk, sector_idx,false);
+          struct buffer_cache_entry *bce = buffer_cache_check(filesys_disk, sector_idx,true);
           if(bce!=NULL&&bce->buffer!=NULL)
           {
             lock_acquire(&bce->entry_lock);
