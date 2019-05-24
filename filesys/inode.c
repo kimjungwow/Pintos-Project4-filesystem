@@ -59,21 +59,24 @@ byte_to_sector (const struct inode *inode, off_t pos)
   inode_grow(inode->sector,&inode->data,pos);
   size_t currentsectors = bytes_to_sectors(inode->data.length);
   size_t targetsector = bytes_to_sectors(pos);
+  // printf("Targetsector %u | pos %u\n",targetsector,pos);
   if(pos==0)
   {
     return *(inode->data.start);
   }
-  else if(currentsectors<124)
+  else if(currentsectors<=124)
   {
     // printf("\nNow less than 124!!!\nReturn : %u | target sector is %u with position %u\n Because start is %u\n",*(inode->data.start+targetsector-1),targetsector,pos,*(inode->data.start));
     return *(inode->data.start+targetsector-1);
   }
-  else if (currentsectors<DISK_SECTOR_SIZE)
+  else if (currentsectors<=DISK_SECTOR_SIZE)
   {
     // printf("\nNow less than 512!!!\n\n");
+    // printf("Hmm %u | before %u | start %p |inode %p\n",*(inode->data.indirect+targetsector-1)
+    // ,*(inode->data.indirect+targetsector-2),inode->data.indirect,inode);
     return *(inode->data.indirect+targetsector-1);
   }
-  else if(currentsectors<DISK_SECTOR_SIZE*DISK_SECTOR_SIZE)
+  else if(currentsectors<=DISK_SECTOR_SIZE*DISK_SECTOR_SIZE)
   {
     PANIC("test case please not here\n");
   }
@@ -114,6 +117,8 @@ inode_grow(disk_sector_t sector, struct inode_disk* disk_inode, off_t length)
   size_t neededsectors = bytes_to_sectors(length);
   size_t currentsectors = bytes_to_sectors(disk_inode->length);
   int i;
+  // printf("length %u | need %u | current %u | currlen %u\n"
+  // ,length,neededsectors,currentsectors,disk_inode->length);
   // disk_sector_t* zerobuffer = calloc(1,DISK_SECTOR_SIZE);
   static char zeros[DISK_SECTOR_SIZE];
 
@@ -494,7 +499,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 
       buffer_cache_write(filesys_disk, sector_idx, buffer+bytes_written,sector_ofs,chunk_size);
       // if(strcmp(thread_current()->name,"main")!=0)
-      //   printf("AFTER\n");
+      //   printf("%u = length |sector %u | file %u| chunk %u|offset %u\n",inode->data.length,sector_idx,inode->sector,chunk_size,offset);
 
       /* Advance. */
       size -= chunk_size;
