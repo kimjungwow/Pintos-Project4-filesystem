@@ -326,9 +326,6 @@ inode_close (struct inode *inode)
           {
             PANIC("NOt yet\n");
           }
-
-
-
           // free_map_release (inode->data.start,
           //                   bytes_to_sectors (inode->data.length));
         }
@@ -376,7 +373,6 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
       if (sector_ofs == 0 && chunk_size == DISK_SECTOR_SIZE)
         {
           /* Read full sector directly into caller's buffer. */
-           // disk_read (filesys_disk, sector_idx, buffer + bytes_read);
           struct buffer_cache_entry *bce = buffer_cache_check(filesys_disk, sector_idx,true);
           if(bce!=NULL&&bce->buffer!=NULL)
           {
@@ -395,15 +391,6 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
         {
           /* Read sector into bounce buffer, then partially copy
              into caller's buffer. */
-/*
-          if (bounce == NULL)
-            {
-              bounce = malloc (DISK_SECTOR_SIZE);
-              if (bounce == NULL)
-                break;
-            }*/
-          // disk_read (filesys_disk, sector_idx, bounce);
-          // memcpy (buffer + bytes_read, bounce + sector_ofs, chunk_size);
           struct buffer_cache_entry *bce = buffer_cache_check(filesys_disk, sector_idx,true);
           if(bce!=NULL&&bce->buffer!=NULL)
           {
@@ -464,7 +451,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
         int growth = size < DISK_SECTOR_SIZE ? size : DISK_SECTOR_SIZE;
         // if(strcmp(thread_current()->name,"main")!=0)
         //   printf("GROWTH! %d\n",growth);
-        inode_grow(inode->sector,&inode->data,growth);
+        inode_grow(inode->sector,&inode->data,inode->data.length+growth);
         inode_left = inode_length (inode) - sector_ofs;
 
       }
@@ -483,45 +470,10 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
         //   printf("\n\nchunk_size is zero...\n\nsize=%d | min_left=%d|inode_left=%d|sector_left=%d\n",size,min_left,inode_left,sector_left);
         break;
       }
-
-
       // if(strcmp(thread_current()->name,"main")!=0)
       //   printf("WRITE : sector_idx = %u |chunk_size = %d | size = %d | ofs = %d | inode_left = %d\n",sector_idx,chunk_size,size,sector_ofs,inode_left);
 
       buffer_cache_write(filesys_disk, sector_idx, buffer+bytes_written,sector_ofs,chunk_size);
-      // printf("OUT#############W\n");
-      // if (sector_ofs == 0 && chunk_size == DISK_SECTOR_SIZE)
-      //   {
-      //     /* Write full sector directly to disk. */
-      //     disk_write (filesys_disk, sector_idx, buffer + bytes_written);
-      //
-      //   }
-      // else
-      //   {
-          // buffer_cache_write(filesys_disk, sector_idx, buffer+bytes_written,sector_ofs,chunksize);
-          /* We need a bounce buffer. */
-
-          // if (bounce == NULL)
-          //   {
-          //     bounce = malloc (DISK_SECTOR_SIZE);
-          //     if (bounce == NULL)
-          //       break;
-          //   }
-
-          /* If the sector contains data before or after the chunk
-             we're writing, then we need to read in the sector
-             first.  Otherwise we start with a sector of all zeros. */
-
-         //  if (sector_ofs > 0 || chunk_size < sector_left)
-         //  {
-         //    disk_read (filesys_disk, sector_idx, bounce);
-         //  }
-         //  else
-         //    memset (bounce, 0, DISK_SECTOR_SIZE);
-         //  memcpy (bounce + sector_ofs, buffer + bytes_written, chunk_size);
-         //  disk_write (filesys_disk, sector_idx, bounce);
-         //
-         // }
 
       /* Advance. */
       size -= chunk_size;
