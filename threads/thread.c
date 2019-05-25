@@ -15,6 +15,9 @@
 #include "userprog/process.h"
 #include "userprog/syscall.h"
 #endif
+// #ifdef FILESYS
+// #include "filesys/directory.h"
+// #endif
 
 
 /* Random value for struct thread's `magic' member.
@@ -103,6 +106,7 @@ thread_init (void)
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+
 
   #ifdef USERPROG
     lock_init(&handlesem);
@@ -212,6 +216,7 @@ thread_create (const char *name, int priority,
 
 
   #endif
+
 
 
   /* Add to run queue. */
@@ -471,6 +476,7 @@ init_thread (struct thread *t, const char *name, int priority)
     t->loadsuccess=true;
     list_init(&t->perprocess_frame_list);
   #endif
+
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and

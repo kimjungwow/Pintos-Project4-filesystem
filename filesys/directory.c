@@ -1,31 +1,29 @@
 #include "filesys/directory.h"
-#include <stdio.h>
-#include <string.h>
-#include <list.h>
-#include "filesys/filesys.h"
-#include "filesys/inode.h"
-#include "threads/malloc.h"
 
-/* A directory. */
-struct dir
-  {
-    struct inode *inode;                /* Backing store. */
-    off_t pos;                          /* Current position. */
-  };
 
-/* A single directory entry. */
-struct dir_entry
-  {
-    disk_sector_t inode_sector;         /* Sector number of header. */
-    char name[NAME_MAX + 1];            /* Null terminated file name. */
-    bool in_use;                        /* In use or free? */
-  };
+// /* A directory. */
+// struct dir
+//   {
+//     struct inode *inode;                /* Backing store. */
+//     off_t pos;                          /* Current position. */
+//   };
+//
+// /* A single directory entry. */
+// struct dir_entry
+//   {
+//
+//     disk_sector_t inode_sector;         /* Sector number of header. */
+//     char name[NAME_MAX + 1];            /* Null terminated file name. */
+//     bool in_use;                        /* In use or free? */
+//     bool isfile;
+//   };
 
 /* Creates a directory with space for ENTRY_CNT entries in the
    given SECTOR.  Returns true if successful, false on failure. */
 bool
 dir_create (disk_sector_t sector, size_t entry_cnt)
 {
+  //Header will be in SECTOR. ENTRY_CNT entries will be in another sectors.
   return inode_create (sector, entry_cnt * sizeof (struct dir_entry));
 }
 
@@ -39,6 +37,7 @@ dir_open (struct inode *inode)
     {
       dir->inode = inode;
       dir->pos = 0;
+      thread_current()->curr_dir=dir;
       return dir;
     }
   else
@@ -105,7 +104,7 @@ lookup (const struct dir *dir, const char *name,
         if (ep != NULL)
           *ep = e;
         if (ofsp != NULL)
-          *ofsp = ofs;
+          *ofsp = ofs; // Offset from dir->inode
         return true;
       }
     }
@@ -145,7 +144,6 @@ dir_add (struct dir *dir, const char *name, disk_sector_t inode_sector)
   struct dir_entry e;
   off_t ofs;
   bool success = false;
-
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
 
@@ -160,13 +158,12 @@ dir_add (struct dir *dir, const char *name, disk_sector_t inode_sector)
   /* Set OFS to offset of free slot.
      If there are no free slots, then it will be set to the
      current end-of-file.
-
      inode_read_at() will only return a short read at end of file.
      Otherwise, we'd need to verify that we didn't get a short
      read due to something intermittent such as low memory. */
   for (ofs = 0; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
        ofs += sizeof e)
-    if (!e.in_use)
+    if (!e.in_use) // Find free slot!
       break;
 
   /* Write slot. */

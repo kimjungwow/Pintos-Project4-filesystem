@@ -6,10 +6,16 @@
 #include <stdint.h>
 #include "synch.h"
 #include "lib/kernel/hash.h"
+#include "filesys/directory.h"
+
 
 #include "vm/page.h"
 
-
+#ifdef FILESYS
+// struct dir;
+// struct inode;
+#include "filesys/directory.h"
+#endif
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -126,6 +132,9 @@ struct thread
     struct list perprocess_frame_list;
 
 
+#endif
+#ifdef FILESYS
+    struct dir* curr_dir;
 #endif
 
 
