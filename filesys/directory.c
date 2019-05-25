@@ -72,6 +72,7 @@ dir_close (struct dir *dir)
     {
       inode_close (dir->inode);
       free (dir);
+      thread_current()->curr_dir=dir_open_root();
     }
 }
 

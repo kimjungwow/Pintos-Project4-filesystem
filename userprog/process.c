@@ -63,14 +63,9 @@ process_execute (const char *file_name)
 	/* Create a new thread to execute FILE_NAME. */
 	tid = thread_create (token, PRI_DEFAULT, start_process, fn_copy);
 	struct thread* child = find_child(tid);
-
-	#ifdef FILESYS
-	// if(strcmp(thread_current()->name,"main")==0)
-		if (thread_current()->curr_dir==NULL)
-			dir_open_root();
-		child->curr_dir=thread_current()->curr_dir;
-	#endif
-
+	if(thread_current()->curr_dir==NULL)
+		thread_current()->curr_dir=dir_open_root();
+	child->curr_dir=thread_current()->curr_dir;
 	sema_down(&child->loadsem);
 	bool child_load_success = child->loadsuccess;
 	sema_up(&child->loadsuccesssem);
@@ -244,7 +239,7 @@ process_exit (void)
 
 	if(strcmp(curr->name,"main")!=0)
 	{
-		if(strcmp(curr->name,"readahead")!=0&&strcmp(curr->name,"writebehind")!=0 )
+		if(strcmp(curr->name,"readahead")!=0)
 			printf("%s: exit(%d)\n",curr->name,curr->returnstatus);
 
 		sema_up(&curr->waitsem);

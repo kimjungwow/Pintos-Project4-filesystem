@@ -669,6 +669,41 @@ syscall_handler (struct intr_frame *f)
 	}
 	case SYS_MKDIR:
 	{
+		char* tempesp = (char *)f->esp;
+		tempesp+=4;
+		if(*(uint32_t *)tempesp>PHYS_BASE)
+		{
+			thread_current()->returnstatus=-1;
+			thread_exit();
+			f->eax=-1;
+		}
+		// if((get_user(*(uint8_t **)tempesp)==-1)||(*tempesp==NULL))
+		if(*(uint32_t **)tempesp==NULL)
+		{
+			thread_current()->returnstatus=-1;
+			thread_exit();
+			f->eax=-1;
+		}
+		char *dirname;
+
+		dirname = palloc_get_page (0);
+		if (dirname == NULL)
+		{
+			f->eax=-1;
+			break;
+		}
+		strlcpy (dirname, *(char **)tempesp, PGSIZE);
+		disk_sector_t inode_sector = 0;
+		free_map_allocate (1, &inode_sector);
+		struct dir *dir = thread_current()->curr_dir;
+		if(dir==NULL)
+			dir=dir_open_root();
+
+
+		dir_add(dir,dirname,inode_sector);
+
+
+		palloc_free_page(dirname);
 		break;
 	}
 	case SYS_READDIR:
