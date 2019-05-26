@@ -11,11 +11,13 @@ struct inode_disk
     // disk_sector_t start;                /* First data sector. */
     off_t length;                       /* File size in bytes. */
     unsigned magic;                     /* Magic number. */
-    disk_sector_t start[124];                /* First data sector. */
+    disk_sector_t start[123];                /* First data sector. */
     // disk_sector_t unused[123];               /* Not used. */
 
     disk_sector_t* indirect; //Pointer has same size with uint32_t
     disk_sector_t** doubly_indirect; //Pointer has same size with  uint32_t
+    bool isdir;
+    uint8_t unused[3];
 
 
     // uint32_t unused[125];               /* Not used. */
