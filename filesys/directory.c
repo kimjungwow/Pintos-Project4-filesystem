@@ -24,7 +24,14 @@ bool
 dir_create (disk_sector_t sector, size_t entry_cnt)
 {
   //Header will be in SECTOR. ENTRY_CNT entries will be in another sectors.
-  return inode_create (sector, entry_cnt * sizeof (struct dir_entry),true);
+  return inode_create (sector, entry_cnt * sizeof (struct dir_entry), true);
+}
+bool
+dir_create_name (char* name,struct dir* dir)
+{
+  disk_sector_t inode_sector = 0;
+  free_map_allocate (1, &inode_sector);
+  return dir_create(inode_sector,16) && dir_add(dir,name,inode_sector);
 }
 
 /* Opens and returns the directory for the given INODE, of which
@@ -32,6 +39,8 @@ dir_create (disk_sector_t sector, size_t entry_cnt)
 struct dir *
 dir_open (struct inode *inode)
 {
+  // if(thread_current()->curr_dir!=NULL)
+  //   dir_close(thread_current()->curr_dir);
   struct dir *dir = calloc (1, sizeof *dir);
   if (inode != NULL && dir != NULL)
     {
@@ -72,8 +81,10 @@ dir_close (struct dir *dir)
     {
       inode_close (dir->inode);
       free (dir);
-      thread_current()->curr_dir=dir_open_root();
+
     }
+  // thread_current()->curr_dir=
+  dir_open_root();
 }
 
 /* Returns the inode encapsulated by DIR. */
@@ -147,7 +158,7 @@ dir_add (struct dir *dir, const char *name, disk_sector_t inode_sector)
   bool success = false;
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
-
+  // printf("BASE %d because add name %s\n",*name == '\0' || strlen (name) > NAME_MAX,name);
   /* Check NAME for validity. */
   if (*name == '\0' || strlen (name) > NAME_MAX)
     return false;
@@ -174,6 +185,8 @@ dir_add (struct dir *dir, const char *name, disk_sector_t inode_sector)
   success = inode_write_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
 
  done:
+
+  // printf("dir_add %d\n",success);
   return success;
 }
 
@@ -237,7 +250,7 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
 struct dir*
 dir_makesure(void)
 {
-  if (thread_current()->curr_dir==NULL)
+  if(thread_current()->curr_dir==NULL)
     dir_open_root();
   return thread_current()->curr_dir;
 }

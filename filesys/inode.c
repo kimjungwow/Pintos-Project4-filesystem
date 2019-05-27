@@ -171,7 +171,6 @@ inode_grow(disk_sector_t sector, struct inode_disk* disk_inode, off_t length)
         PANIC("Fail to allocate free map.\n"); // Fail to allocate
       else
         buffer_cache_write(filesys_disk,*(doubly+(i%DISK_SECTOR_SIZE)),zeros,0,DISK_SECTOR_SIZE);// Success to allocate -> make all value zero
-
     }
   }
   else
@@ -212,16 +211,15 @@ inode_create (disk_sector_t sector, off_t length, bool isdir)
       disk_inode->length = 0;
       disk_inode->magic = INODE_MAGIC;
       disk_inode->isdir=isdir;
-
       if (inode_grow(sector,disk_inode,length))
         {
           buffer_cache_write(filesys_disk, sector, disk_inode,0,DISK_SECTOR_SIZE);
           success = true;
         }
-
-
       free (disk_inode);
     }
+  if(!success)
+    printf("inode_create false\n");
   return success;
 }
 
