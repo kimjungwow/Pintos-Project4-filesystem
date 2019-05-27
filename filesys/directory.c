@@ -24,7 +24,7 @@ bool
 dir_create (disk_sector_t sector, size_t entry_cnt)
 {
   //Header will be in SECTOR. ENTRY_CNT entries will be in another sectors.
-  return inode_create (sector, entry_cnt * sizeof (struct dir_entry));
+  return inode_create (sector, entry_cnt * sizeof (struct dir_entry),true);
 }
 
 /* Opens and returns the directory for the given INODE, of which

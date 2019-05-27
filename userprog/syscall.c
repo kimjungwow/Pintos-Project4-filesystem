@@ -759,21 +759,19 @@ syscall_handler (struct intr_frame *f)
       struct inode *inode = NULL;
       if(!dir_lookup(dir_makesure(),dirname,&inode))
       {
-        palloc_free_page(dirname);
         f->eax=false;
-        break;
       }
       else
       {
-
-        palloc_free_page(dirname);
+        if((inode->data).isdir ==true)
+        {
+          dir_open(inode);
+          f->eax=true;
+        }
+        else
+          f->eax=false;
       }
-
-
-
-
-
-
+      palloc_free_page(dirname);
       break;
    }
    case SYS_MKDIR:

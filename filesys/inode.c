@@ -1,5 +1,4 @@
 #include "filesys/inode.h"
-#include <list.h>
 #include <debug.h>
 #include <round.h>
 #include <string.h>
@@ -37,16 +36,16 @@ bytes_to_sectors (off_t size)
   return DIV_ROUND_UP (size, DISK_SECTOR_SIZE);
 }
 
-/* In-memory inode. */
-struct inode
-  {
-    struct list_elem elem;              /* Element in inode list. */
-    disk_sector_t sector;               /* Sector number of disk location. */
-    int open_cnt;                       /* Number of openers. */
-    bool removed;                       /* True if deleted, false otherwise. */
-    int deny_write_cnt;                 /* 0: writes ok, >0: deny writes. */
-    struct inode_disk data;             /* Inode content. */
-  };
+// /* In-memory inode. */
+// struct inode
+//   {
+//     struct list_elem elem;              /* Element in inode list. */
+//     disk_sector_t sector;               /* Sector number of disk location. */
+//     int open_cnt;                       /* Number of openers. */
+//     bool removed;                       /* True if deleted, false otherwise. */
+//     int deny_write_cnt;                 /* 0: writes ok, >0: deny writes. */
+//     struct inode_disk data;             /* Inode content. */
+//   };
 
 /* Returns the disk sector that contains byte offset POS within
    INODE.
@@ -195,7 +194,7 @@ inode_grow(disk_sector_t sector, struct inode_disk* disk_inode, off_t length)
    Returns true if successful.
    Returns false if memory or disk allocation fails. */
 bool
-inode_create (disk_sector_t sector, off_t length)
+inode_create (disk_sector_t sector, off_t length, bool isdir)
 {
   struct inode_disk *disk_inode = NULL;
   bool success = false;
@@ -212,6 +211,7 @@ inode_create (disk_sector_t sector, off_t length)
       size_t sectors = bytes_to_sectors (length);
       disk_inode->length = 0;
       disk_inode->magic = INODE_MAGIC;
+      disk_inode->isdir=isdir;
 
       if (inode_grow(sector,disk_inode,length))
         {
