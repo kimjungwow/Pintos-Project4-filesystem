@@ -21,10 +21,10 @@
 static int
 get_user (const uint8_t *uaddr)
 {
-	int result;
-	asm ("movl $1f, %0; movzbl %1, %0; 1:"
-	     : "=&a" (result) : "m" (*uaddr));
-	return result;
+   int result;
+   asm ("movl $1f, %0; movzbl %1, %0; 1:"
+        : "=&a" (result) : "m" (*uaddr));
+   return result;
 }
 /* Writes BYTE to user address UDST.
    UDST must be below PHYS_BASE.
@@ -32,10 +32,10 @@ get_user (const uint8_t *uaddr)
 static bool
 put_user (uint8_t *udst, uint8_t byte)
 {
-	int error_code;
-	asm ("movl $1f, %0; movb %b2, %1; 1:"
-	     : "=&a" (error_code), "=m" (*udst) : "q" (byte));
-	return error_code != -1;
+   int error_code;
+   asm ("movl $1f, %0; movb %b2, %1; 1:"
+        : "=&a" (error_code), "=m" (*udst) : "q" (byte));
+   return error_code != -1;
 }
 
 
@@ -49,74 +49,76 @@ void
 syscall_init (void)
 {
 
-	intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
+   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
+
+
 
 static void
 syscall_handler (struct intr_frame *f)
 {
-	thread_current()->process_stack=f->esp;
-	if((f->esp>PHYS_BASE)||(get_user((uint8_t *)f->esp)==-1))
-	{
-		thread_current()->returnstatus=-1;
-		thread_exit();
-	}
-	uint32_t num = *(uint32_t *)f->esp;
+   thread_current()->process_stack=f->esp;
+   if((f->esp>PHYS_BASE)||(get_user((uint8_t *)f->esp)==-1))
+   {
+      thread_current()->returnstatus=-1;
+      thread_exit();
+   }
+   uint32_t num = *(uint32_t *)f->esp;
 
-	switch(num)
-	{
-	case SYS_HALT:
-	{
-		power_off();
-		break;
-	}
-	case SYS_EXIT:
-	{
-		char* tempesp = (char *)f->esp;
-		tempesp+=4;
-		if (*(uint32_t *)tempesp<PHYS_BASE)
-			thread_current()->returnstatus=get_user((uint8_t *)tempesp);
-		else
-			thread_current()->returnstatus=-1;
-		thread_exit ();
-		break;
-	}
-	case SYS_EXEC:
-	{
-		char* tempesp = (char *)f->esp;
-		tempesp+=4;
-		if(*(uint32_t *)tempesp>PHYS_BASE)
-		{
-			thread_current()->returnstatus=-1;
-			thread_exit();
-		}
-		if((*tempesp==NULL)||(get_user(*(uint8_t **)tempesp)==-1))
-		{
-			thread_current()->returnstatus=-1;
-			thread_exit();
-		}
-		char *cmd_line;
+   switch(num)
+   {
+   case SYS_HALT:
+   {
+      power_off();
+      break;
+   }
+   case SYS_EXIT:
+   {
+      char* tempesp = (char *)f->esp;
+      tempesp+=4;
+      if (*(uint32_t *)tempesp<PHYS_BASE)
+         thread_current()->returnstatus=get_user((uint8_t *)tempesp);
+      else
+         thread_current()->returnstatus=-1;
+      thread_exit ();
+      break;
+   }
+   case SYS_EXEC:
+   {
+      char* tempesp = (char *)f->esp;
+      tempesp+=4;
+      if(*(uint32_t *)tempesp>PHYS_BASE)
+      {
+         thread_current()->returnstatus=-1;
+         thread_exit();
+      }
+      if((*tempesp==NULL)||(get_user(*(uint8_t **)tempesp)==-1))
+      {
+         thread_current()->returnstatus=-1;
+         thread_exit();
+      }
+      char *cmd_line;
 
-		cmd_line = palloc_get_page (0);
+      cmd_line = palloc_get_page (0);
 
-		if (cmd_line == NULL)
-		{
-			f->eax=-1;
-			break;
-			// return -1;
-		}
-		strlcpy (cmd_line, *(char **)tempesp, PGSIZE);
+      if (cmd_line == NULL)
+      {
+         f->eax=-1;
+         break;
+         // return -1;
+      }
+      strlcpy (cmd_line, *(char **)tempesp, PGSIZE);
 
-		int answer = (int)process_execute(cmd_line);
+      int answer = (int)process_execute(cmd_line);
 
-		f->eax = answer;
-		// file_close(openedfile);
-		palloc_free_page(cmd_line);
+      f->eax = answer;
+      // file_close(openedfile);
+      palloc_free_page(cmd_line);
 
 
-		break;
+      break;
 
-	}
+   }
 
 /*Waits for a child process pid and retrieves the child's exit status.
 
@@ -135,592 +137,697 @@ syscall_handler (struct intr_frame *f)
 
    Implementing this system call requires considerably more work than any of the rest.*/
 
-	case SYS_WAIT:
-	{
-		char* tempesp = (char *)f->esp;
+   case SYS_WAIT:
+   {
+      char* tempesp = (char *)f->esp;
 
-		tempesp+=4;
-		pid_t pid = *(pid_t *)tempesp;
-		// printf("pid : %d\n", pid);
-		int answer = process_wait((tid_t)pid);
-		f->eax = answer;
-		break;
-	}
-	case SYS_CREATE:
-	{
-		char* tempesp = (char *)f->esp;
-		tempesp+=4;
-		if(*(uint32_t *)tempesp>PHYS_BASE)
-		{
-			thread_current()->returnstatus=-1;
-			thread_exit();
-		}
+      tempesp+=4;
+      pid_t pid = *(pid_t *)tempesp;
+      // printf("pid : %d\n", pid);
+      int answer = process_wait((tid_t)pid);
+      f->eax = answer;
+      break;
+   }
+   case SYS_CREATE:
+   {
+      char* tempesp = (char *)f->esp;
+      tempesp+=4;
+      if(*(uint32_t *)tempesp>PHYS_BASE)
+      {
+         thread_current()->returnstatus=-1;
+         thread_exit();
+      }
 
-		if((*tempesp==NULL)||(get_user(*(uint8_t **)tempesp)==-1))
-		{
-			thread_current()->returnstatus=-1;
-			thread_exit();
-		}
-		bool answer=false;
-		if (*tempesp=='\0')
-		{
-			thread_current()->returnstatus=-1;
-			thread_exit ();
-		}
-		else
-		{
-			char *file;
+      if((*tempesp==NULL)||(get_user(*(uint8_t **)tempesp)==-1))
+      {
+         thread_current()->returnstatus=-1;
+         thread_exit();
+      }
+      bool answer=false;
+      if (*tempesp=='\0')
+      {
+         thread_current()->returnstatus=-1;
+         thread_exit ();
+      }
+      else
+      {
+         char *file;
 
-			file = palloc_get_page (0);
-			if (file == NULL)
-			{
-				f->eax=-1;
-				break;
-				// return -1;
-			}
-			strlcpy (file, *(char **)tempesp, PGSIZE);
-			tempesp+=4;
-			unsigned initial_size = *(unsigned *)tempesp;
-			if((strlen(file)<=14)&&(strlen(file)>0))
-			{
-				lock_acquire(&handlesem);
-				answer = filesys_create(file, initial_size);
-				lock_release(&handlesem);
-			}
-			palloc_free_page(file);
-		}
-		f->eax=answer;
-		barrier();
-		break;
-	}
-	case SYS_REMOVE:
-	{
-		char* tempesp = (char *)f->esp;
-		tempesp+=4;
-		if(*(uint32_t *)tempesp>PHYS_BASE)
-			thread_exit();
-		char *file;
+         file = palloc_get_page (0);
+         if (file == NULL)
+         {
+            f->eax=-1;
+            break;
+            // return -1;
+         }
+         strlcpy (file, *(char **)tempesp, PGSIZE);
+         tempesp+=4;
+         unsigned initial_size = *(unsigned *)tempesp;
 
-		file = palloc_get_page (0);
-		if (file == NULL)
-		{
-			f->eax=-1;
-			break;
-			// return -1;
-		}
-		strlcpy (file, *(char **)tempesp, PGSIZE);
-		lock_acquire(&handlesem);
-		bool answer = filesys_remove(file);
-		lock_release(&handlesem);
+         if((strlen(file)<=14)&&(strlen(file)>0))
+         {
+            char *fn_copy = palloc_get_page (0);
+            if (fn_copy == NULL)
+               return TID_ERROR;
+            strlcpy (fn_copy, file, PGSIZE); // Copy filename
+            if(file[0]=='/') //Absolute path
+            {
+               PANIC("ABSOULUTE PATH!!\n");
+               // Start from root directory
+               dir_close(thread_current()->curr_dir);
 
-		f->eax=answer;
-		palloc_free_page(file);
-		barrier();
-		break;
-	}
-	case SYS_OPEN:
-	{
-		char* tempesp = (char *)f->esp;
-		tempesp+=4;
-		if(*(uint32_t *)tempesp>PHYS_BASE)
-		{
-			thread_current()->returnstatus=-1;
-			thread_exit();
-			f->eax=-1;
-		}
-		// if((get_user(*(uint8_t **)tempesp)==-1)||(*tempesp==NULL))
-		if(*(uint32_t **)tempesp==NULL)
-		{
-			thread_current()->returnstatus=-1;
-			thread_exit();
-			f->eax=-1;
-		}
-		char *file;
+               char *token, *save_ptr, *prev=NULL;
 
-		file = palloc_get_page (0);
-		if (file == NULL)
-		{
-			f->eax=-1;
-			break;
-		}
-		strlcpy (file, *(char **)tempesp, PGSIZE);
+               for (token = strtok_r (fn_copy, "/", &save_ptr); token != NULL;
+                      token = strtok_r (NULL, "/", &save_ptr))
+                      {
+                         //Go into deep directory
+                         //Use chdir
+                         printf ("%s <- \n", token);
+                      }
 
-		lock_acquire(&handlesem);
-		struct file* openedfile = filesys_open(file);
-		lock_release(&handlesem);
-		filenum++;
-		palloc_free_page(file);
-		barrier();
 
-		int fd;
-		if (openedfile==NULL)
-		{
-			fd=-1;
-			filenum--;
-			// palloc_free_page(file);
-			// df->eax=fd;
-		}
-		else
-		{
-			fd= thread_current()->nextfd;
-			if(fd>=64)
-			{
-				fd=-1;
-				lock_acquire(&handlesem);
-				file_close(openedfile);
-				lock_release(&handlesem);
-				filenum--;
+            }
+            else
+            {
+               // Relative PATH
+               char *token, *save_ptr;
 
-			} else
-			{
-				thread_current()->fdtable[fd]=openedfile;
-				thread_current()->nextfd++;
-				// printf("OPEN SYS_OPEN %p address | FILES %d\n",openedfile,filenum);
-			}
+               for (token = strtok_r (fn_copy, "/", &save_ptr); token != NULL;
+                      token = strtok_r (NULL, "/", &save_ptr))
+               {
+                  struct inode *inode = NULL;
 
-		}
-		f->eax=fd;
-		barrier();
-		break;
-	}
-	case SYS_FILESIZE:
-	{
-		char* tempesp = (char *)f->esp;
-		tempesp+=4;
-		int fd = *(int *)tempesp;
-		struct file* filetoread = thread_current()->fdtable[fd];
-		int filesize;
-		if (filetoread==NULL)
-			filesize = -1;
-		else
-		{
-			lock_acquire(&handlesem);
-			filesize = (int)(file_length(filetoread));
-			lock_release(&handlesem);
-		}
-		f->eax=filesize;
-		barrier();
-		break;
-	}
+                dir_lookup (dir_makesure(), token, &inode);
+                  char *purefile = strchr(file,'/');
 
-	/*Reads size bytes from the file open as fd into buffer.
-	   Returns the number of bytes actually read (0 at end of file), or -1
-	   if the file could not be read (due to a condition other than end of file).
-	   Fd 0 reads from the keyboard using input_getc().*/
-	case SYS_READ:
-	{
-
-		char* tempesp = (char *)f->esp;
-
-		tempesp+=4;
-		int fd = *(int *)tempesp;
-		tempesp+=4;
-		if((fd<0)||(fd>64))
-		{
-			thread_current()->returnstatus=-1;
-			thread_exit();
-		}
-		// if(*(uint8_t **)tempesp>PHYS_BASE)
-		if(*(uint32_t *)tempesp>PHYS_BASE||(tempesp==NULL))
-		{
-			thread_current()->returnstatus=-1;
-			thread_exit();
-		}
-		// if((put_user(*(uint8_t **)tempesp,size)==-1)||tempesp==NULL)
-		if((get_user(*(uint8_t **)tempesp)==-1)||(tempesp==NULL))
-		{
-			thread_current()->returnstatus=-1;
-			thread_exit();
-		}
-
-		char *buffer;
-
-		buffer = *(char **)tempesp;
-		tempesp+=4;
-		unsigned size = *(unsigned *)tempesp;
-
-		unsigned i;
-		uint8_t fdzero;
-		if(fd == 0)
-		{
-			for (i=0; i<size; i++)
-			{
-				fdzero = input_getc();
-				*buffer = (char)fdzero;
-				buffer++;
-			}
-			f->eax=size;
-		}
-		else if (fd>1)
-		{
-			if (size==0)
-			{
-				f->eax=0;
-			}
-			else
-			{
-				struct file* filetoread = thread_current()->fdtable[fd];
-
-				if (filetoread==NULL)
-					f->eax=-1;
-				else if(get_user(*(uint8_t **)filetoread)==-1)
-				{
-					f->eax=-1;
-				}
-				// else if(is_code_vaddr(buffer)) // For pt-write-code2
-				// // else if(is_code_vaddr(buffer)&&pagedir_get_page(thread_current()->pagedir,pg_round_down(buffer-2*PGSIZE))==NULL) // To avoid allocate something on code section or below code section
-				// {
-				// 	thread_current()->returnstatus=-1;
-				// 	thread_exit();
-				// }
-				else
-				{
-					barrier();
-					lock_acquire(&handlesem);
-					off_t readbytes = file_read(filetoread,(void *) buffer, (off_t)size);
-					lock_release(&handlesem);
-					f->eax=(uint32_t)readbytes;
-
-				}
-
-			}
-		}
-		barrier();
-
-		break;
-	}
-	case SYS_WRITE:
-	{
-		char* tempesp = (char *)f->esp;
-
-		tempesp+=4;
-		int fd = *(int *)tempesp;
-		tempesp+=4;
-		if(*(uint32_t *)tempesp>PHYS_BASE)
-		{
-			thread_current()->returnstatus=-1;
-			thread_exit();
-		}
-
-		char *buffer = *(char **)tempesp;
-		tempesp+=4;
-		unsigned size = *(unsigned *)tempesp, temp;
-		if(fd==1)
-		{
-
-			while(size>100)
-			{
-				putbuf(buffer,100);
-				buffer+=100;
-				size-=100;
-				barrier();
-			}
-			putbuf(buffer,size);
-
-		}
-		else
-		{
-			if (fd<=0)
-			{
-				thread_current()->returnstatus=-1;
-				thread_exit();
-			}
-			else if(fd>sizeof(thread_current()->fdtable)/sizeof(struct file*))
-			{
-				thread_current()->returnstatus=-1;
-				thread_exit();
-			}
-			else if(thread_current()->fdtable[fd]==NULL)
-			{
-				thread_current()->returnstatus=-1;
-				thread_exit();
-			}
-			else if((get_user((uint8_t *)buffer)==-1)||(buffer==NULL))
-			{
-				thread_current()->returnstatus=-1;
-				thread_exit();
-			}
-
-			struct file* filetowrite = thread_current()->fdtable[fd];
-			lock_acquire(&handlesem);
-			off_t writebytes = file_write(filetowrite,(void *) buffer, (off_t)size);
-			lock_release(&handlesem);
-			f->eax=(int)writebytes;
-		}
-		barrier();
-		break;
-	}
-	case SYS_SEEK:
-	{
-		char* tempesp = (char *)f->esp;
-
-		tempesp+=4;
-		int fd = *(int *)tempesp;
-		tempesp+=4;
-		unsigned position = *(unsigned *)tempesp;
-		struct file* filetoseek = thread_current()->fdtable[fd];
-		if(filetoseek==NULL)
-			break;
-		else
-		{
-			lock_acquire(&handlesem);
-			file_seek(filetoseek,(off_t)position);
-			lock_release(&handlesem);
-			break;
-		}
-
-	}
-	case SYS_TELL:
-	{
-		char* tempesp = (char *)f->esp;
-
-		tempesp+=4;
-		int fd = *(int *)tempesp;
-		struct file* filetotell = thread_current()->fdtable[fd];
-		if(filetotell==NULL)
-			break;
-		else
-		{
-			lock_acquire(&handlesem);
-			unsigned answertell=(unsigned)file_tell(filetotell);
-			lock_release(&handlesem);
-			f->eax = answertell;
-
-			break;
-		}
-	}
-	case SYS_CLOSE:
-	{
-		char* tempesp = (char *)f->esp;
-		tempesp+=4;
-		int fd = *(int *)tempesp;
-		if((fd<0)||(fd>64))
-		{
-			thread_current()->returnstatus=-1;
-			thread_exit();
-		}
-
-		struct file* filetoclose = thread_current()->fdtable[fd];
-		if(filetoclose!=NULL)
-		{
-			thread_current()->fdtable[fd]=NULL;
-			lock_acquire(&handlesem);
-			file_close(filetoclose);
-			lock_release(&handlesem);
-			filenum--;
-			// printf("CLOSE SIBALSIBAL %p address | FILES %d\n",filetoclose,filenum);
-		}
-		else
-		{
-			thread_current()->returnstatus=-1;
-			thread_exit();
-		}
-
-		barrier();
-		break;
-	}
-	case SYS_MMAP:
-	{
-		char* tempesp = (char *)f->esp;
-
-		tempesp+=4;
-		int fd = *(int *)tempesp;
-		tempesp+=4;
-		if((fd<2)||(fd>64)||thread_current()->fdtable[fd]==NULL)
-		{
-			f->eax=MAP_FAILED;
-			break;
-		}
-
-		if(*(uint32_t *)tempesp>PHYS_BASE||(*(char **)tempesp==NULL))
-		{
-			f->eax=MAP_FAILED;
-			break;
-		}
-
-		char *addr;
-		addr = *(char **)tempesp;
-		if(pg_ofs(addr)!=0||file_length(thread_current()->fdtable[fd])==0)
-		{
-			f->eax=MAP_FAILED;
-			break;
-		}
-		if(thread_current()->suppagetable!=NULL)
-		{
-
-			struct sup_page_table_entry check;
-			check.user_vaddr=pg_round_down(addr);
-			struct hash_elem *he = hash_find(&thread_current()->hash, &check.hash_elem);
-			if (he!=NULL)
-			{
-				f->eax=MAP_FAILED;
-				break;
-			}
-		}
-
-		lock_acquire(&handlesem);
-		struct file* openedfile = file_reopen(thread_current()->fdtable[fd]);
-		lock_release(&handlesem);
-		// thread_current()->mmaptable[thread_current()->nextmmapfd]=openedfile;
-		thread_current()->nextmmapfd++;
+                  if(purefile!=NULL)
+                  {
+                     printf("In! %s\n",purefile);
 
 
 
-		off_t remain = file_length(openedfile), already=0;
-		while(remain>0)
-		{
-			off_t read_bytes, zero_bytes;
-			if (remain>PGSIZE)
-			{
-				read_bytes=PGSIZE;
-				zero_bytes=0;
-				remain-=PGSIZE;
-			}
-			else
-			{
-				read_bytes=remain;
-				zero_bytes=PGSIZE-read_bytes;
-				remain-=read_bytes;
-			}
-			struct sup_page_table_entry *new = allocate_page(openedfile, already, addr+already,
-				read_bytes, zero_bytes, true);
-			if(new==NULL)
-			{
-				f->eax=MAP_FAILED;
-				if(openedfile!=NULL)
-				{
-					lock_acquire(&handlesem);
-					file_close(openedfile);
-					lock_release(&handlesem);
-				}
-				break;
-			}
-			new->mapid=thread_current()->next_mapid;
-			new->mmapfd=fd;
-			already+=PGSIZE;
-		}
-
-		f->eax=(mapid_t)thread_current()->next_mapid;
-		thread_current()->mmaptable[thread_current()->next_mapid]=openedfile;
-		// struct mmapentry* newme = (struct mmapentry*)malloc(sizeof (struct mmapentry));
-		// newme->mmapfile=openedfile;
-
-		// list_push_back(&thread_current()->mmaplist,&newme->me_elem);
-
-		thread_current()->next_mapid++;
+                  }
+                  else
+                  {
+                     printf("No\n");
+                  }
+                  printf ("%s  ~~ %s ~~~%s| CHECK\n", token,fn_copy,save_ptr);
+                  printf ("%d  ~~ %d ~~~%d| LEN\n\n", strlen(token),strlen(fn_copy),strlen(save_ptr));
+               }
 
 
-		break;
-	}
-	case SYS_MUNMAP:
-	{
-		char* tempesp = (char *)f->esp;
-
-		tempesp+=4;
-		mapid_t mapid = *(mapid_t *)tempesp;
-
-		struct hash_iterator i;
-
-		hash_first (&i, &thread_current()->hash);
-		hash_next(&i);
-		while (hash_cur (&i))
-		{
-			struct sup_page_table_entry *spte = hash_entry (hash_cur (&i), struct sup_page_table_entry, hash_elem);
-			if((mapid_t)spte->mapid==mapid)
-			{
-				if(pagedir_is_dirty(thread_current()->pagedir,spte->user_vaddr))
-				{
-					spte_set_dirty(spte->user_vaddr,true);
-					void* target = (void *)((char *)spte->file + spte->ofs);
-					lock_acquire(&handlesem);
-					struct file* filetowrite = thread_current()->fdtable[spte->mmapfd];
-					off_t size = strlen((char *)spte->user_vaddr);
-					file_seek(spte->file,0);
-					off_t temppos = file_tell(spte->file);
-					off_t writebytes = file_write(spte->file,spte->user_vaddr, strlen((char *)spte->user_vaddr));
-					file_seek(spte->file,temppos);
-					lock_release(&handlesem);
-				}
-				hash_next(&i);
-				file_close(spte->file);
-				hash_delete(&thread_current()->hash,&spte->hash_elem);
-				free(spte);
-			}
-			else
-			{
-				hash_next(&i);
-			}
-
-		}
-		// if(thread_current()->mmaptable[mapid]!=NULL)
-		// {
-		// 	lock_acquire(&handlesem);
-		// 	file_close(thread_current()->mmaptable[mapid]);
-		// 	lock_release(&handlesem);
-		// }
+            }
 
 
+            unsigned char wkr="/";
 
-		break;
-	}
-	case SYS_CHDIR:
-	{
-		break;
-	}
-	case SYS_MKDIR:
-	{
-		char* tempesp = (char *)f->esp;
-		tempesp+=4;
-		if(*(uint32_t *)tempesp>PHYS_BASE)
-		{
-			thread_current()->returnstatus=-1;
-			thread_exit();
-			f->eax=-1;
-		}
-		// if((get_user(*(uint8_t **)tempesp)==-1)||(*tempesp==NULL))
-		if(*(uint32_t **)tempesp==NULL)
-		{
-			thread_current()->returnstatus=-1;
-			thread_exit();
-			f->eax=-1;
-		}
-		char *dirname;
+            lock_acquire(&handlesem);
+            answer = filesys_create(file, initial_size);
+            printf("%s\n",fn_copy);
+            printf("%s\n",file);
+            palloc_free_page(fn_copy);
+            lock_release(&handlesem);
+         }
+         else
+         {
+            printf("NOT PROPER file\n");
+         }
+         palloc_free_page(file);
+      }
+      f->eax=answer;
+      barrier();
+      break;
+   }
+   case SYS_REMOVE:
+   {
+      char* tempesp = (char *)f->esp;
+      tempesp+=4;
+      if(*(uint32_t *)tempesp>PHYS_BASE)
+         thread_exit();
+      char *file;
 
-		dirname = palloc_get_page (0);
-		if (dirname == NULL)
-		{
-			f->eax=-1;
-			break;
-		}
-		strlcpy (dirname, *(char **)tempesp, PGSIZE);
-		disk_sector_t inode_sector = 0;
-		free_map_allocate (1, &inode_sector);
-		struct dir *dir = thread_current()->curr_dir;
-		if(dir==NULL)
-			dir=dir_open_root();
+      file = palloc_get_page (0);
+      if (file == NULL)
+      {
+         f->eax=-1;
+         break;
+         // return -1;
+      }
+      strlcpy (file, *(char **)tempesp, PGSIZE);
+      lock_acquire(&handlesem);
+      bool answer = filesys_remove(file);
+      lock_release(&handlesem);
+
+      f->eax=answer;
+      palloc_free_page(file);
+      barrier();
+      break;
+   }
+   case SYS_OPEN:
+   {
+      char* tempesp = (char *)f->esp;
+      tempesp+=4;
+      if(*(uint32_t *)tempesp>PHYS_BASE)
+      {
+         thread_current()->returnstatus=-1;
+         thread_exit();
+         f->eax=-1;
+      }
+      // if((get_user(*(uint8_t **)tempesp)==-1)||(*tempesp==NULL))
+      if(*(uint32_t **)tempesp==NULL)
+      {
+         thread_current()->returnstatus=-1;
+         thread_exit();
+         f->eax=-1;
+      }
+      char *file;
+
+      file = palloc_get_page (0);
+      if (file == NULL)
+      {
+         f->eax=-1;
+         break;
+      }
+      strlcpy (file, *(char **)tempesp, PGSIZE);
+
+      lock_acquire(&handlesem);
+      struct file* openedfile = filesys_open(file);
+      // printf("\nOPEN %s\n\n",file);
+      lock_release(&handlesem);
+      filenum++;
+      palloc_free_page(file);
+      barrier();
+
+      int fd;
+      if (openedfile==NULL)
+      {
+         fd=-1;
+         filenum--;
+         // palloc_free_page(file);
+         // df->eax=fd;
+      }
+      else
+      {
+         fd= thread_current()->nextfd;
+         if(fd>=64)
+         {
+            fd=-1;
+            lock_acquire(&handlesem);
+            file_close(openedfile);
+            lock_release(&handlesem);
+            filenum--;
+
+         } else
+         {
+            thread_current()->fdtable[fd]=openedfile;
+            thread_current()->nextfd++;
+            // printf("OPEN SYS_OPEN %p address | FILES %d\n",openedfile,filenum);
+         }
+
+      }
+      f->eax=fd;
+      barrier();
+      break;
+   }
+   case SYS_FILESIZE:
+   {
+      char* tempesp = (char *)f->esp;
+      tempesp+=4;
+      int fd = *(int *)tempesp;
+      struct file* filetoread = thread_current()->fdtable[fd];
+      int filesize;
+      if (filetoread==NULL)
+         filesize = -1;
+      else
+      {
+         lock_acquire(&handlesem);
+         filesize = (int)(file_length(filetoread));
+         lock_release(&handlesem);
+      }
+      f->eax=filesize;
+      barrier();
+      break;
+   }
+
+   /*Reads size bytes from the file open as fd into buffer.
+      Returns the number of bytes actually read (0 at end of file), or -1
+      if the file could not be read (due to a condition other than end of file).
+      Fd 0 reads from the keyboard using input_getc().*/
+   case SYS_READ:
+   {
+
+      char* tempesp = (char *)f->esp;
+
+      tempesp+=4;
+      int fd = *(int *)tempesp;
+      tempesp+=4;
+      if((fd<0)||(fd>64))
+      {
+         thread_current()->returnstatus=-1;
+         thread_exit();
+      }
+      // if(*(uint8_t **)tempesp>PHYS_BASE)
+      if(*(uint32_t *)tempesp>PHYS_BASE||(tempesp==NULL))
+      {
+         thread_current()->returnstatus=-1;
+         thread_exit();
+      }
+      // if((put_user(*(uint8_t **)tempesp,size)==-1)||tempesp==NULL)
+      if((get_user(*(uint8_t **)tempesp)==-1)||(tempesp==NULL))
+      {
+         thread_current()->returnstatus=-1;
+         thread_exit();
+      }
+
+      char *buffer;
+
+      buffer = *(char **)tempesp;
+      tempesp+=4;
+      unsigned size = *(unsigned *)tempesp;
+
+      unsigned i;
+      uint8_t fdzero;
+      if(fd == 0)
+      {
+         for (i=0; i<size; i++)
+         {
+            fdzero = input_getc();
+            *buffer = (char)fdzero;
+            buffer++;
+         }
+         f->eax=size;
+      }
+      else if (fd>1)
+      {
+         if (size==0)
+         {
+            f->eax=0;
+         }
+         else
+         {
+            struct file* filetoread = thread_current()->fdtable[fd];
+
+            if (filetoread==NULL)
+               f->eax=-1;
+            else if(get_user(*(uint8_t **)filetoread)==-1)
+            {
+               f->eax=-1;
+            }
+            // else if(is_code_vaddr(buffer)) // For pt-write-code2
+            // // else if(is_code_vaddr(buffer)&&pagedir_get_page(thread_current()->pagedir,pg_round_down(buffer-2*PGSIZE))==NULL) // To avoid allocate something on code section or below code section
+            // {
+            //    thread_current()->returnstatus=-1;
+            //    thread_exit();
+            // }
+            else
+            {
+               barrier();
+               lock_acquire(&handlesem);
+               off_t readbytes = file_read(filetoread,(void *) buffer, (off_t)size);
+               lock_release(&handlesem);
+               f->eax=(uint32_t)readbytes;
+
+            }
+
+         }
+      }
+      barrier();
+
+      break;
+   }
+   case SYS_WRITE:
+   {
+      char* tempesp = (char *)f->esp;
+
+      tempesp+=4;
+      int fd = *(int *)tempesp;
+      tempesp+=4;
+      if(*(uint32_t *)tempesp>PHYS_BASE)
+      {
+         thread_current()->returnstatus=-1;
+         thread_exit();
+      }
+
+      char *buffer = *(char **)tempesp;
+      tempesp+=4;
+      unsigned size = *(unsigned *)tempesp, temp;
+      if(fd==1)
+      {
+
+         while(size>100)
+         {
+            putbuf(buffer,100);
+            buffer+=100;
+            size-=100;
+            barrier();
+         }
+         putbuf(buffer,size);
+
+      }
+      else
+      {
+         if (fd<=0)
+         {
+            thread_current()->returnstatus=-1;
+            thread_exit();
+         }
+         else if(fd>sizeof(thread_current()->fdtable)/sizeof(struct file*))
+         {
+            thread_current()->returnstatus=-1;
+            thread_exit();
+         }
+         else if(thread_current()->fdtable[fd]==NULL)
+         {
+            thread_current()->returnstatus=-1;
+            thread_exit();
+         }
+         else if((get_user((uint8_t *)buffer)==-1)||(buffer==NULL))
+         {
+            thread_current()->returnstatus=-1;
+            thread_exit();
+         }
+
+         struct file* filetowrite = thread_current()->fdtable[fd];
+         lock_acquire(&handlesem);
+         off_t writebytes = file_write(filetowrite,(void *) buffer, (off_t)size);
+         lock_release(&handlesem);
+         f->eax=(int)writebytes;
+      }
+      barrier();
+      break;
+   }
+   case SYS_SEEK:
+   {
+      char* tempesp = (char *)f->esp;
+
+      tempesp+=4;
+      int fd = *(int *)tempesp;
+      tempesp+=4;
+      unsigned position = *(unsigned *)tempesp;
+      struct file* filetoseek = thread_current()->fdtable[fd];
+      if(filetoseek==NULL)
+         break;
+      else
+      {
+         lock_acquire(&handlesem);
+         file_seek(filetoseek,(off_t)position);
+         lock_release(&handlesem);
+         break;
+      }
+
+   }
+   case SYS_TELL:
+   {
+      char* tempesp = (char *)f->esp;
+
+      tempesp+=4;
+      int fd = *(int *)tempesp;
+      struct file* filetotell = thread_current()->fdtable[fd];
+      if(filetotell==NULL)
+         break;
+      else
+      {
+         lock_acquire(&handlesem);
+         unsigned answertell=(unsigned)file_tell(filetotell);
+         lock_release(&handlesem);
+         f->eax = answertell;
+
+         break;
+      }
+   }
+   case SYS_CLOSE:
+   {
+      char* tempesp = (char *)f->esp;
+      tempesp+=4;
+      int fd = *(int *)tempesp;
+      if((fd<0)||(fd>64))
+      {
+         thread_current()->returnstatus=-1;
+         thread_exit();
+      }
+
+      struct file* filetoclose = thread_current()->fdtable[fd];
+      if(filetoclose!=NULL)
+      {
+         thread_current()->fdtable[fd]=NULL;
+         lock_acquire(&handlesem);
+         file_close(filetoclose);
+         lock_release(&handlesem);
+         filenum--;
+         // printf("CLOSE SIBALSIBAL %p address | FILES %d\n",filetoclose,filenum);
+      }
+      else
+      {
+         thread_current()->returnstatus=-1;
+         thread_exit();
+      }
+
+      barrier();
+      break;
+   }
+   case SYS_MMAP:
+   {
+      char* tempesp = (char *)f->esp;
+
+      tempesp+=4;
+      int fd = *(int *)tempesp;
+      tempesp+=4;
+      if((fd<2)||(fd>64)||thread_current()->fdtable[fd]==NULL)
+      {
+         f->eax=MAP_FAILED;
+         break;
+      }
+
+      if(*(uint32_t *)tempesp>PHYS_BASE||(*(char **)tempesp==NULL))
+      {
+         f->eax=MAP_FAILED;
+         break;
+      }
+
+      char *addr;
+      addr = *(char **)tempesp;
+      if(pg_ofs(addr)!=0||file_length(thread_current()->fdtable[fd])==0)
+      {
+         f->eax=MAP_FAILED;
+         break;
+      }
+      if(thread_current()->suppagetable!=NULL)
+      {
+
+         struct sup_page_table_entry check;
+         check.user_vaddr=pg_round_down(addr);
+         struct hash_elem *he = hash_find(&thread_current()->hash, &check.hash_elem);
+         if (he!=NULL)
+         {
+            f->eax=MAP_FAILED;
+            break;
+         }
+      }
+
+      lock_acquire(&handlesem);
+      struct file* openedfile = file_reopen(thread_current()->fdtable[fd]);
+      lock_release(&handlesem);
+      // thread_current()->mmaptable[thread_current()->nextmmapfd]=openedfile;
+      thread_current()->nextmmapfd++;
 
 
-		dir_add(dir,dirname,inode_sector);
+
+      off_t remain = file_length(openedfile), already=0;
+      while(remain>0)
+      {
+         off_t read_bytes, zero_bytes;
+         if (remain>PGSIZE)
+         {
+            read_bytes=PGSIZE;
+            zero_bytes=0;
+            remain-=PGSIZE;
+         }
+         else
+         {
+            read_bytes=remain;
+            zero_bytes=PGSIZE-read_bytes;
+            remain-=read_bytes;
+         }
+         struct sup_page_table_entry *new = allocate_page(openedfile, already, addr+already,
+            read_bytes, zero_bytes, true);
+         if(new==NULL)
+         {
+            f->eax=MAP_FAILED;
+            if(openedfile!=NULL)
+            {
+               lock_acquire(&handlesem);
+               file_close(openedfile);
+               lock_release(&handlesem);
+            }
+            break;
+         }
+         new->mapid=thread_current()->next_mapid;
+         new->mmapfd=fd;
+         already+=PGSIZE;
+      }
+
+      f->eax=(mapid_t)thread_current()->next_mapid;
+      thread_current()->mmaptable[thread_current()->next_mapid]=openedfile;
+      // struct mmapentry* newme = (struct mmapentry*)malloc(sizeof (struct mmapentry));
+      // newme->mmapfile=openedfile;
+
+      // list_push_back(&thread_current()->mmaplist,&newme->me_elem);
+
+      thread_current()->next_mapid++;
 
 
-		palloc_free_page(dirname);
-		break;
-	}
-	case SYS_READDIR:
-	{
-		break;
-	}
-	case SYS_ISDIR:
-	{
-		break;
-	}
-	case SYS_INUMBER:
-	{
-		break;
-	}
-	default:
-		break;
+      break;
+   }
+   case SYS_MUNMAP:
+   {
+      char* tempesp = (char *)f->esp;
 
-	}
-	// thread_exit ();
+      tempesp+=4;
+      mapid_t mapid = *(mapid_t *)tempesp;
+
+      struct hash_iterator i;
+
+      hash_first (&i, &thread_current()->hash);
+      hash_next(&i);
+      while (hash_cur (&i))
+      {
+         struct sup_page_table_entry *spte = hash_entry (hash_cur (&i), struct sup_page_table_entry, hash_elem);
+         if((mapid_t)spte->mapid==mapid)
+         {
+            if(pagedir_is_dirty(thread_current()->pagedir,spte->user_vaddr))
+            {
+               spte_set_dirty(spte->user_vaddr,true);
+               void* target = (void *)((char *)spte->file + spte->ofs);
+               lock_acquire(&handlesem);
+               struct file* filetowrite = thread_current()->fdtable[spte->mmapfd];
+               off_t size = strlen((char *)spte->user_vaddr);
+               file_seek(spte->file,0);
+               off_t temppos = file_tell(spte->file);
+               off_t writebytes = file_write(spte->file,spte->user_vaddr, strlen((char *)spte->user_vaddr));
+               file_seek(spte->file,temppos);
+               lock_release(&handlesem);
+            }
+            hash_next(&i);
+            file_close(spte->file);
+            hash_delete(&thread_current()->hash,&spte->hash_elem);
+            free(spte);
+         }
+         else
+         {
+            hash_next(&i);
+         }
+
+      }
+      // if(thread_current()->mmaptable[mapid]!=NULL)
+      // {
+      //    lock_acquire(&handlesem);
+      //    file_close(thread_current()->mmaptable[mapid]);
+      //    lock_release(&handlesem);
+      // }
+
+
+
+      break;
+   }
+   case SYS_CHDIR:
+   {
+      char* tempesp = (char *)f->esp;
+      tempesp+=4;
+      if(*(uint32_t *)tempesp>PHYS_BASE)
+      {
+         thread_current()->returnstatus=-1;
+         thread_exit();
+         f->eax=-1;
+      }
+      // if((get_user(*(uint8_t **)tempesp)==-1)||(*tempesp==NULL))
+      if(*(uint32_t **)tempesp==NULL)
+      {
+         thread_current()->returnstatus=-1;
+         thread_exit();
+         f->eax=-1;
+      }
+      char *dirname;
+
+      dirname = palloc_get_page (0);
+      if (dirname == NULL)
+      {
+         f->eax=-1;
+         break;
+      }
+      strlcpy (dirname, *(char **)tempesp, PGSIZE);
+      struct inode *inode = NULL;
+      if(!dir_lookup(dir_makesure(),dirname,&inode))
+      {
+        palloc_free_page(dirname);
+        f->eax=false;
+        break;
+      }
+      else
+      {
+
+        palloc_free_page(dirname);
+      }
+
+
+
+
+
+
+      break;
+   }
+   case SYS_MKDIR:
+   {
+
+         char* tempesp = (char *)f->esp;
+         tempesp+=4;
+         if(*(uint32_t *)tempesp>PHYS_BASE)
+         {
+            thread_current()->returnstatus=-1;
+            thread_exit();
+            f->eax=-1;
+         }
+         // if((get_user(*(uint8_t **)tempesp)==-1)||(*tempesp==NULL))
+         if(*(uint32_t **)tempesp==NULL)
+         {
+            thread_current()->returnstatus=-1;
+            thread_exit();
+            f->eax=-1;
+         }
+         char *dirname;
+
+         dirname = palloc_get_page (0);
+         if (dirname == NULL)
+         {
+            f->eax=-1;
+            break;
+         }
+         strlcpy (dirname, *(char **)tempesp, PGSIZE);
+         disk_sector_t inode_sector = 0;
+         free_map_allocate (1, &inode_sector);
+         dir_create(inode_sector,16);
+         if(thread_current()->curr_dir==NULL)
+            dir_open_root();
+         dir_add(thread_current()->curr_dir,dirname,inode_sector);
+         palloc_free_page(dirname);
+
+      break;
+   }
+   case SYS_READDIR:
+   {
+      break;
+   }
+   case SYS_ISDIR:
+   {
+      break;
+   }
+   case SYS_INUMBER:
+   {
+      break;
+   }
+   default:
+      break;
+
+   }
+   // thread_exit ();
 }
