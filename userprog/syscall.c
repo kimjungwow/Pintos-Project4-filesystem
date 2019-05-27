@@ -157,7 +157,6 @@ syscall_handler (struct intr_frame *f)
          thread_current()->returnstatus=-1;
          thread_exit();
       }
-
       if((*tempesp==NULL)||(get_user(*(uint8_t **)tempesp)==-1))
       {
          thread_current()->returnstatus=-1;
@@ -172,7 +171,6 @@ syscall_handler (struct intr_frame *f)
       else
       {
          char *file;
-
          file = palloc_get_page (0);
          if (file == NULL)
          {
@@ -183,7 +181,6 @@ syscall_handler (struct intr_frame *f)
          strlcpy (file, *(char **)tempesp, PGSIZE);
          tempesp+=4;
          unsigned initial_size = *(unsigned *)tempesp;
-
          if((strlen(file)<=14)&&(strlen(file)>0))
          {
             char *fn_copy = palloc_get_page (0);
@@ -195,9 +192,7 @@ syscall_handler (struct intr_frame *f)
                PANIC("ABSOULUTE PATH!!\n");
                // Start from root directory
                dir_close(thread_current()->curr_dir);
-
                char *token, *save_ptr, *prev=NULL;
-
                for (token = strtok_r (fn_copy, "/", &save_ptr); token != NULL;
                       token = strtok_r (NULL, "/", &save_ptr))
                       {
@@ -205,49 +200,41 @@ syscall_handler (struct intr_frame *f)
                          //Use chdir
                          printf ("%s <- \n", token);
                       }
-
-
+              lock_acquire(&handlesem);
+              answer = filesys_create(file, initial_size);
+              printf("%s\n",fn_copy);
+              printf("%s\n",file);
+              palloc_free_page(fn_copy);
+              lock_release(&handlesem);
             }
             else
             {
-               // Relative PATH
-               char *token, *save_ptr;
+              char *purefile = strchr(file,'/');
+              if(purefile!=NULL)
+              {
+                // Relative PATH
+                char *token, *save_ptr, *prev=NULL;
+                for (token = strtok_r (fn_copy, "/", &save_ptr); token != NULL;
+                       token = strtok_r (NULL, "/", &save_ptr))
+                {
+                   if(prev!=NULL)
+                   {
+                     struct inode *inode = NULL;
+                     dir_lookup (dir_makesure(), prev, &inode);
+                     printf("%s prev | %s token\n",prev,token);
+                   }
 
-               for (token = strtok_r (fn_copy, "/", &save_ptr); token != NULL;
-                      token = strtok_r (NULL, "/", &save_ptr))
-               {
-                  struct inode *inode = NULL;
-
-                dir_lookup (dir_makesure(), token, &inode);
-                  char *purefile = strchr(file,'/');
-
-                  if(purefile!=NULL)
-                  {
-                     printf("In! %s\n",purefile);
-
-
-
-                  }
-                  else
-                  {
-                     printf("No\n");
-                  }
-                  printf ("%s  ~~ %s ~~~%s| CHECK\n", token,fn_copy,save_ptr);
-                  printf ("%d  ~~ %d ~~~%d| LEN\n\n", strlen(token),strlen(fn_copy),strlen(save_ptr));
-               }
-
-
+                   prev=token;
+                }
+              }
+              else
+              {
+                lock_acquire(&handlesem);
+                answer = filesys_create(file, initial_size);
+                palloc_free_page(fn_copy);
+                lock_release(&handlesem);
+              }
             }
-
-
-            unsigned char wkr="/";
-
-            lock_acquire(&handlesem);
-            answer = filesys_create(file, initial_size);
-            printf("%s\n",fn_copy);
-            printf("%s\n",file);
-            palloc_free_page(fn_copy);
-            lock_release(&handlesem);
          }
          else
          {
