@@ -252,12 +252,6 @@ syscall_handler (struct intr_frame *f)
 						palloc_free_page(fn_copy);
 						break;
 					}
-
-
-
-
-
-
 					/*
 					   lock_acquire(&handlesem);
 					   answer = filesys_create(file, initial_size);
@@ -280,11 +274,13 @@ syscall_handler (struct intr_frame *f)
 						{
 							if(prev!=NULL)
 							{
+									// printf("%s prev | %s token\n",prev,token);
 								struct inode *inode = NULL;
 								if(dir_lookup (dir_makesure(), prev, &inode))
 								{
 									if(inode->data.isdir==false)
 									{
+										// printf("NOT dir\n");
 										fail=true;
 										break;
 									}
@@ -292,17 +288,19 @@ syscall_handler (struct intr_frame *f)
 								}
 								else
 								{
+									// printf("Can't find\n");
 									fail=true;
 									break;
 								}
-								// printf("%s prev | %s token\n",prev,token);
+
 							}
 							prev=token;
 						}
-						palloc_free_page(fn_copy);
+
 						if(fail)
 						{
 							f->eax=false;
+							palloc_free_page(fn_copy);
 							break;
 						}
 						else
@@ -312,6 +310,7 @@ syscall_handler (struct intr_frame *f)
 
 							lock_release(&handlesem);
 							f->eax=answer;
+							palloc_free_page(fn_copy);
 							break;
 						}
 					}
@@ -429,7 +428,7 @@ syscall_handler (struct intr_frame *f)
     }
     else
     {
-
+			// printf("rel file open %s\n",file);
   		lock_acquire(&handlesem);
   		openedfile = filesys_open(file);
   		// printf("\nOPEN %s\n\n",file);
@@ -437,16 +436,17 @@ syscall_handler (struct intr_frame *f)
   		filenum++;
   		palloc_free_page(file);
   		barrier();
-    }
+    }/*
     if(fail)
     {
       f->eax=-1;
       break;
-    }
+    }*/
 
 		int fd;
 		if (openedfile==NULL)
 		{
+			// printf("NULL open\n");
 			fd=-1;
 			filenum--;
 			// palloc_free_page(file);
@@ -634,10 +634,19 @@ syscall_handler (struct intr_frame *f)
 			}
 
 			struct file* filetowrite = thread_current()->fdtable[fd];
-			lock_acquire(&handlesem);
-			off_t writebytes = file_write(filetowrite,(void *) buffer, (off_t)size);
-			lock_release(&handlesem);
-			f->eax=(int)writebytes;
+			if(filetowrite->inode->data.isdir==true)
+			{
+				f->eax=-1;
+			}
+			else
+			{
+				lock_acquire(&handlesem);
+				off_t writebytes = file_write(filetowrite,(void *) buffer, (off_t)size);
+				lock_release(&handlesem);
+				f->eax=(int)writebytes;
+
+			}
+
 		}
 		barrier();
 		break;
@@ -892,6 +901,7 @@ syscall_handler (struct intr_frame *f)
 			{
 				dir_open(inode);
 				f->eax=true;
+				// printf("OPEN directory %s success\n",dirname);
 			}
 			else
 				f->eax=false;
@@ -926,6 +936,12 @@ syscall_handler (struct intr_frame *f)
 			break;
 		}
 		strlcpy (dirname, *(char **)tempesp, PGSIZE);
+		if(strlen(dirname)==0)
+		{
+			palloc_free_page(dirname);
+			f->eax=false;
+			break;
+		}
 		disk_sector_t inode_sector = 0;
 		free_map_allocate (1, &inode_sector);
 		if(dirname[0]=='/') //Absolute path
