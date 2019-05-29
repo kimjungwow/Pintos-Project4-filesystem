@@ -525,57 +525,109 @@ syscall_handler (struct intr_frame *f)
     bool fail=false;
     if(file[0]=='/')
     {
-      char *fn_copy = palloc_get_page (0);
-      if (fn_copy == NULL)
-        return TID_ERROR;
-      strlcpy (fn_copy, file, PGSIZE); // Copy filename
-			char *token, *save_ptr, *prev=NULL;
-			for (token = strtok_r (fn_copy, "/", &save_ptr); token != NULL;
-			     token = strtok_r (NULL, "/", &save_ptr))
+			if(strcmp(file,"/")==0)
 			{
-				if(prev!=NULL)
-				{
-					struct inode *inode = NULL;
-					if(dir_lookup (dir_makesure(), prev, &inode))
-					{
-						if(inode->data.isdir==false)
-						{
-							fail=true;
-							break;
-						}
-						dir_open(inode);
+				lock_acquire(&handlesem);
+	      openedfile = file_open(inode_open(1));
+	      // printf("\nOPEN %s\n\n",file);
+	      lock_release(&handlesem);
+	      filenum++;
 
-					}
-				}
-				prev=token;
+	      palloc_free_page(file);
+
 			}
-      lock_acquire(&handlesem);
-      openedfile = filesys_open(prev);
-      // printf("\nOPEN %s\n\n",file);
-      lock_release(&handlesem);
-      filenum++;
-      palloc_free_page(fn_copy);
-      palloc_free_page(file);
+			else
+			{
+				char *fn_copy = palloc_get_page (0);
+				if (fn_copy == NULL)
+					return TID_ERROR;
+				strlcpy (fn_copy, file, PGSIZE); // Copy filename
+				char *token, *save_ptr, *prev=NULL;
+				for (token = strtok_r (fn_copy, "/", &save_ptr); token != NULL;
+						 token = strtok_r (NULL, "/", &save_ptr))
+				{
+					if(prev!=NULL)
+					{
+						struct inode *inode = NULL;
+						if(dir_lookup (dir_makesure(), prev, &inode))
+						{
+							if(inode->data.isdir==false)
+							{
+								fail=true;
+								break;
+							}
+							dir_open(inode);
 
-      barrier();
+						}
+					}
+					prev=token;
+				}
+				lock_acquire(&handlesem);
+				openedfile = filesys_open(prev);
+				// printf("\nOPEN %s\n\n",file);
+				lock_release(&handlesem);
+				filenum++;
+				palloc_free_page(fn_copy);
+				palloc_free_page(file);
+
+				barrier();
+			}
+
 
     }
     else
     {
-			// printf("rel file open %s\n",file);
-  		lock_acquire(&handlesem);
-  		openedfile = filesys_open(file);
-  		// printf("\nOPEN %s\n\n",file);
-  		lock_release(&handlesem);
-  		filenum++;
-  		palloc_free_page(file);
-  		barrier();
-    }/*
-    if(fail)
-    {
-      f->eax=-1;
-      break;
-    }*/
+			char *purefile = strchr(file,'/');
+			if(purefile!=NULL)
+			{
+				char *fn_copy = palloc_get_page (0);
+				if (fn_copy == NULL)
+					return TID_ERROR;
+				strlcpy (fn_copy, file, PGSIZE); // Copy filename
+				char *token, *save_ptr, *prev=NULL;
+				struct inode* inode =NULL;
+				for (token = strtok_r (fn_copy, "/", &save_ptr); token != NULL;
+						 token = strtok_r (NULL, "/", &save_ptr))
+				{
+					if(prev!=NULL)
+					{
+
+						if(dir_lookup (dir_makesure(), prev, &inode))
+						{
+							if(inode->data.isdir==false)
+							{
+								printf("NOT DIR!\n");
+								fail=true;
+								break;
+							}
+							dir_open(inode);
+
+						}
+					}
+					prev=token;
+				}
+				lock_acquire(&handlesem);
+				openedfile = filesys_open(prev);
+				// printf("\nOPEN %s\n\n",file);
+				lock_release(&handlesem);
+				filenum++;
+				palloc_free_page(fn_copy);
+				palloc_free_page(file);
+
+				barrier();
+
+
+			}
+			else
+			{
+	  		lock_acquire(&handlesem);
+	  		openedfile = filesys_open(file);
+	  		lock_release(&handlesem);
+	  		filenum++;
+	  		palloc_free_page(file);
+	  		barrier();
+			}
+    }
 
 		int fd;
 		if (openedfile==NULL)
@@ -1198,10 +1250,30 @@ syscall_handler (struct intr_frame *f)
 	}
 	case SYS_ISDIR:
 	{
+		char* tempesp = (char *)f->esp;
+		tempesp+=4;
+		int fd = *(int *)tempesp;
+		struct file* filetoread = thread_current()->fdtable[fd];
+		if (filetoread==NULL)
+		{
+			f->eax=false;
+			break;
+		}
+		f->eax= filetoread->inode->data.isdir;
 		break;
 	}
 	case SYS_INUMBER:
 	{
+		char* tempesp = (char *)f->esp;
+		tempesp+=4;
+		int fd = *(int *)tempesp;
+		struct file* filetoread = thread_current()->fdtable[fd];
+		if (filetoread==NULL)
+		{
+			f->eax=-1;
+			break;
+		}
+		f->eax= filetoread->inode->sector;
 		break;
 	}
 	default:
