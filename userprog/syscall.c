@@ -238,6 +238,7 @@ syscall_handler (struct intr_frame *f)
 					{
 						f->eax=false;
 						palloc_free_page(fn_copy);
+						palloc_free_page(file);
 						break;
 					}
 					else
@@ -250,6 +251,7 @@ syscall_handler (struct intr_frame *f)
 						lock_release(&handlesem);
 						f->eax=answer;
 						palloc_free_page(fn_copy);
+						palloc_free_page(file);
 						break;
 					}
 					/*
@@ -301,6 +303,7 @@ syscall_handler (struct intr_frame *f)
 						{
 							f->eax=false;
 							palloc_free_page(fn_copy);
+							palloc_free_page(file);
 							break;
 						}
 						else
@@ -311,6 +314,7 @@ syscall_handler (struct intr_frame *f)
 							lock_release(&handlesem);
 							f->eax=answer;
 							palloc_free_page(fn_copy);
+							palloc_free_page(file);
 							break;
 						}
 					}
@@ -321,6 +325,7 @@ syscall_handler (struct intr_frame *f)
 						palloc_free_page(fn_copy);
 						lock_release(&handlesem);
 						f->eax=answer;
+						palloc_free_page(file);
 						break;
 					}
 				}
@@ -352,14 +357,136 @@ syscall_handler (struct intr_frame *f)
 			// return -1;
 		}
 		strlcpy (file, *(char **)tempesp, PGSIZE);
-		lock_acquire(&handlesem);
-		bool answer = filesys_remove(file);
-		lock_release(&handlesem);
+		char *fn_copy = palloc_get_page (0);
+		if (fn_copy == NULL)
+			return TID_ERROR;
+		strlcpy (fn_copy, file, PGSIZE); // Copy filename
+		if(file[0]=='/')
+		{
+			dir_close(thread_current()->curr_dir);
 
-		f->eax=answer;
-		palloc_free_page(file);
-		barrier();
-		break;
+			char *token, *save_ptr, *prev=NULL;
+			bool fail=false;
+			for (token = strtok_r (fn_copy, "/", &save_ptr); token != NULL;
+					 token = strtok_r (NULL, "/", &save_ptr))
+			{
+				if(prev!=NULL)
+				{
+					struct inode *inode = NULL;
+					if(dir_lookup (dir_makesure(), prev, &inode))
+					{
+						if(inode->data.isdir==false)
+						{
+							fail=true;
+							break;
+						}
+						dir_open(inode);
+					}
+					else
+					{
+						fail=true;
+						break;
+					}
+				}
+				prev=token;
+			}
+			if(fail)
+			{
+				f->eax=false;
+				palloc_free_page(fn_copy);
+				palloc_free_page(file);
+				break;
+			}
+			else
+			{
+				lock_acquire(&handlesem);
+				bool answer = filesys_remove(prev);
+				lock_release(&handlesem);
+				f->eax=answer;
+				palloc_free_page(fn_copy);
+				palloc_free_page(file);
+				break;
+			}
+
+		}
+		else
+		{
+			char *purefile = strchr(file,'/');
+			char *token, *save_ptr, *prev=NULL;
+			bool fail=false;
+			if(purefile!=NULL)
+			{
+				// Relative PATH
+				for (token = strtok_r (fn_copy, "/", &save_ptr); token != NULL;
+						 token = strtok_r (NULL, "/", &save_ptr))
+				{
+					if(prev!=NULL)
+					{
+						struct inode *inode = NULL;
+						if(dir_lookup (dir_makesure(), prev, &inode))
+						{
+							if(inode->data.isdir==false)
+							{
+								fail=true;
+								break;
+							}
+							dir_open(inode);
+						}
+						else
+						{
+							fail=true;
+							break;
+						}
+					}
+					prev=token;
+				}
+				if(fail)
+				{
+					f->eax=false;
+					palloc_free_page(fn_copy);
+					palloc_free_page(file);
+					break;
+				}
+				else
+				{
+					lock_acquire(&handlesem);
+					bool answer = filesys_remove(prev);
+					lock_release(&handlesem);
+					f->eax=answer;
+					palloc_free_page(fn_copy);
+					palloc_free_page(file);
+					break;
+				}
+			}
+			else
+			{
+				lock_acquire(&handlesem);
+				bool answer = filesys_remove(file);
+				palloc_free_page(fn_copy);
+				lock_release(&handlesem);
+				f->eax=answer;
+				palloc_free_page(file);
+				break;
+			}
+
+
+
+		}
+
+
+
+
+
+
+
+		// lock_acquire(&handlesem);
+		// bool answer = filesys_remove(file);
+		// lock_release(&handlesem);
+		//
+		// f->eax=answer;
+		// palloc_free_page(file);
+		// barrier();
+		// break;
 	}
 	case SYS_OPEN:
 	{
@@ -975,7 +1102,7 @@ syscall_handler (struct intr_frame *f)
 				prev=token;
 			}
       dir_create(inode_sector,16);
-      dir_add(thread_current()->curr_dir,prev,inode_sector);
+      f->eax=dir_add(thread_current()->curr_dir,prev,inode_sector);
 
 
 		}
@@ -984,7 +1111,8 @@ syscall_handler (struct intr_frame *f)
 			dir_create(inode_sector,16);
 			if(thread_current()->curr_dir==NULL)
 				dir_open_root();
-			dir_add(thread_current()->curr_dir,dirname,inode_sector);
+
+			f->eax=dir_add(thread_current()->curr_dir,dirname,inode_sector);
 		}
 
 
