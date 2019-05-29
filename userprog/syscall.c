@@ -228,9 +228,6 @@ syscall_handler (struct intr_frame *f)
 							// printf("%s prev | %s token\n",prev,token);
 						}
 						prev=token;
-						// printf("prev is %s\n",prev);
-						//Go into deep directory
-						//Use chdir
 
 					}
 
@@ -499,6 +496,7 @@ syscall_handler (struct intr_frame *f)
 	{
 		char* tempesp = (char *)f->esp;
 		tempesp+=4;
+		struct dir* prevdir = dir_makesure();
 		if(*(uint32_t *)tempesp>PHYS_BASE)
 		{
 			thread_current()->returnstatus=-1;
@@ -628,6 +626,10 @@ syscall_handler (struct intr_frame *f)
 	  		barrier();
 			}
     }
+		printf("Before RECOVER curr_dir = %d\n",dir_makesure()->inode->sector);
+		thread_current()->curr_dir=prevdir;
+		printf("AFTER RECOVER curr_dir = %d\n",dir_makesure()->inode->sector);
+
 
 		int fd;
 		if (openedfile==NULL)
@@ -1039,15 +1041,6 @@ syscall_handler (struct intr_frame *f)
 			}
 
 		}
-		// if(thread_current()->mmaptable[mapid]!=NULL)
-		// {
-		//    lock_acquire(&handlesem);
-		//    file_close(thread_current()->mmaptable[mapid]);
-		//    lock_release(&handlesem);
-		// }
-
-
-
 		break;
 	}
 	case SYS_CHDIR:
@@ -1077,9 +1070,11 @@ syscall_handler (struct intr_frame *f)
 		}
 		strlcpy (dirname, *(char **)tempesp, PGSIZE);
 		struct inode *inode = NULL;
+		printf("Before lookup. name :%s | dir_sector : %d \n", dirname, dir_makesure()->inode->sector);
 		if(!dir_lookup(dir_makesure(),dirname,&inode))
 		{
-			// printf("NOT EXISTED\n");
+
+			printf("NOT EXISTED. name :%s | dir_sector : %d \n", dirname, dir_makesure()->inode->sector);
 			f->eax=false;
 		}
 		else
@@ -1088,7 +1083,7 @@ syscall_handler (struct intr_frame *f)
 			{
 				dir_open(inode);
 				f->eax=true;
-				// printf("OPEN directory %s success\n",dirname);
+				printf("OPEN directory %s success\n",dirname);
 			}
 			else
 				f->eax=false;
@@ -1235,10 +1230,6 @@ syscall_handler (struct intr_frame *f)
 			if(answer)
 				dir_reopen(tempdir);
 		}
-
-
-
-
 		palloc_free_page(dirname);
 		palloc_free_page(fn_copy);
 
@@ -1246,6 +1237,48 @@ syscall_handler (struct intr_frame *f)
 	}
 	case SYS_READDIR:
 	{
+			char* tempesp = (char *)f->esp;
+			tempesp+=4;
+			int fd = *(int *)tempesp;
+			tempesp+=4;
+
+			if(*(uint32_t *)tempesp>PHYS_BASE)
+			{
+				thread_current()->returnstatus=-1;
+				thread_exit();
+				f->eax=-1;
+			}
+			if(*(uint32_t **)tempesp==NULL)
+			{
+				thread_current()->returnstatus=-1;
+				thread_exit();
+				f->eax=-1;
+			}
+			struct file* file_dir = thread_current()->fdtable[fd];
+			if(file_dir==NULL || file_dir->inode->data.isdir==false)
+			{
+				f->eax=false;
+				break;
+			}
+			struct dir* prevdir=dir_makesure();
+			printf("Before readdir. dir_sector : %d \n", dir_makesure()->inode->sector);
+			bool opensuc= dir_open(file_dir->inode->sector)!=NULL;
+
+
+			bool answer = false;
+			if(opensuc)
+			{
+				answer=dir_readdir(dir_makesure(),*(char **)tempesp);
+				dir_reopen(prevdir);
+			}
+
+
+			printf("AFTER readdir. dir_sector : %d \n", dir_makesure()->inode->sector);
+			f->eax=answer;
+			break;
+
+
+
 		break;
 	}
 	case SYS_ISDIR:
