@@ -1027,7 +1027,7 @@ syscall_handler (struct intr_frame *f)
 		struct inode *inode = NULL;
 		if(!dir_lookup(dir_makesure(),dirname,&inode))
 		{
-			printf("NOT EXISTED\n");
+			// printf("NOT EXISTED\n");
 			f->eax=false;
 		}
 		else
@@ -1111,7 +1111,7 @@ syscall_handler (struct intr_frame *f)
 				}
 				prev=token;
 			}
-      dir_create(inode_sector,16,true);
+      dir_create(inode_sector,16);
 			bool answer=dir_add(dir_makesure(),prev,inode_sector);
 			struct dir* tempdir;
 			if(answer)
@@ -1159,13 +1159,13 @@ syscall_handler (struct intr_frame *f)
 					palloc_free_page(fn_copy);
 					break;
 				}
-				dir_create(inode_sector,16,true);
+				dir_create(inode_sector,16);
 				answer=dir_add(dir_makesure(),dirname,inode_sector);
 
 			}
 			else
 			{
-				dir_create(inode_sector,16,true);
+				dir_create(inode_sector,16);
 				answer=dir_add(dir_makesure(),dirname,inode_sector);
 
 			}

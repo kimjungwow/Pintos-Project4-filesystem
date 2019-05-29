@@ -21,17 +21,17 @@
 /* Creates a directory with space for ENTRY_CNT entries in the
    given SECTOR.  Returns true if successful, false on failure. */
 bool
-dir_create (disk_sector_t sector, size_t entry_cnt, bool origin)
+dir_create (disk_sector_t sector, size_t entry_cnt)
 {
   //Header will be in SECTOR. ENTRY_CNT entries will be in another sectors.
   return inode_create (sector, entry_cnt * sizeof (struct dir_entry), true);
 }
 bool
-dir_create_name (char* name,struct dir* dir, bool origin)
+dir_create_name (char* name,struct dir* dir)
 {
   disk_sector_t inode_sector = 0;
   free_map_allocate (1, &inode_sector);
-  return dir_create(inode_sector,16, origin) && dir_add(dir,name,inode_sector);
+  return dir_create(inode_sector,16) && dir_add(dir,name,inode_sector);
 }
 
 /* Opens and returns the directory for the given INODE, of which

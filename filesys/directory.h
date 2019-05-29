@@ -44,8 +44,8 @@ struct dir_entry
   };
 
 /* Opening and closing directories. */
-bool dir_create (disk_sector_t sector, size_t entry_cnt, bool);
-bool dir_create_name (char* name,struct dir* dir, bool);
+bool dir_create (disk_sector_t sector, size_t entry_cnt);
+bool dir_create_name (char* name,struct dir* dir);
 struct dir *dir_open (struct inode *);
 struct dir *dir_open_root (void);
 struct dir *dir_reopen (struct dir *);
