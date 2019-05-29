@@ -21,17 +21,17 @@
 /* Creates a directory with space for ENTRY_CNT entries in the
    given SECTOR.  Returns true if successful, false on failure. */
 bool
-dir_create (disk_sector_t sector, size_t entry_cnt)
+dir_create (disk_sector_t sector, size_t entry_cnt, bool origin)
 {
   //Header will be in SECTOR. ENTRY_CNT entries will be in another sectors.
   return inode_create (sector, entry_cnt * sizeof (struct dir_entry), true);
 }
 bool
-dir_create_name (char* name,struct dir* dir)
+dir_create_name (char* name,struct dir* dir, bool origin)
 {
   disk_sector_t inode_sector = 0;
   free_map_allocate (1, &inode_sector);
-  return dir_create(inode_sector,16) && dir_add(dir,name,inode_sector);
+  return dir_create(inode_sector,16, origin) && dir_add(dir,name,inode_sector);
 }
 
 /* Opens and returns the directory for the given INODE, of which
@@ -213,16 +213,46 @@ dir_remove (struct dir *dir, const char *name)
   if (inode == NULL)
     goto done;
 
+  if(inode->data.isdir)
+  {
+    struct dir_entry ee;
+    int i;
+    off_t reads=0;
+    int many=0;
+    off_t pos=0;
+    while (inode_read_at (inode, &ee, sizeof ee, pos) == sizeof ee)
+      {
+        pos += sizeof ee;
+        if (ee.in_use)
+          {
+            // printf("USE | %s\n",name);
+            many++;
+          }
+      }
+    // printf("MANY %d\n",many);
+    if(many>=3)
+    {
+
+      goto done;
+    }
+
+  }
+
+
   /* Erase directory entry. */
   e.in_use = false;
   if (inode_write_at (dir->inode, &e, sizeof e, ofs) != sizeof e)
+  {
+    printf("%s 4 \n",name);
     goto done;
+  }
 
   /* Remove inode. */
   inode_remove (inode);
   success = true;
 
  done:
+
   inode_close (inode);
   return success;
 }
