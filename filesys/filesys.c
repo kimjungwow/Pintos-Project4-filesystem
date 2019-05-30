@@ -55,15 +55,15 @@ filesys_create (const char *name, off_t initial_size)
   else
     dir=dir_reopen(thread_current()->curr_dir);
 
-    // dir=dir_open_root();
-  // struct dir *dir = dir_open_root ();
-  // printf("BEFORE %d\n",dir!=NULL);
-  bool success = (dir != NULL
+  // bool success = (dir != NULL
+  bool success = (dir != NULL && dir->inode->removed==false
                   && free_map_allocate (1, &inode_sector)
                   && inode_create (inode_sector, initial_size,false)
                   && dir_add (dir, name, inode_sector));
   if (!success && inode_sector != 0)
     free_map_release (inode_sector, 1);
+
+  // printf("create %s | in dir with removed %d\n",name,dir->inode->removed);
   dir_close (dir);
 
 
@@ -79,7 +79,9 @@ struct file *
 filesys_open (const char *name)
 {
   // struct dir *dir = dir_open_root ();
-  struct dir *dir = dir_makesure();
+  struct dir *dir = dir_reopen(dir_makesure());
+  if(dir->inode->removed)
+    return NULL;
   struct inode *inode = NULL;
 
 
@@ -98,8 +100,8 @@ filesys_open (const char *name)
 bool
 filesys_remove (const char *name)
 {
-  // struct dir *dir = dir_open_root ();
   struct dir *dir = dir_makesure ();
+  // struct dir *dir = dir_reopen(dir_makesure ());
   bool success = dir != NULL && dir_remove (dir, name);
   dir_close (dir);
 

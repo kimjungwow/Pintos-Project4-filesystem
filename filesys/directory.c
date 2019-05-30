@@ -203,11 +203,11 @@ dir_remove (struct dir *dir, const char *name)
 
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
-
+  // printf("above lookup\n");
   /* Find directory entry. */
   if (!lookup (dir, name, &e, &ofs))
     goto done;
-
+    // printf("above inodeopen\n");
   /* Open inode. */
   inode = inode_open (e.inode_sector);
   if (inode == NULL)
@@ -232,7 +232,6 @@ dir_remove (struct dir *dir, const char *name)
     // printf("MANY %d\n",many);
     if(many>=3)
     {
-
       goto done;
     }
 
@@ -243,7 +242,6 @@ dir_remove (struct dir *dir, const char *name)
   e.in_use = false;
   if (inode_write_at (dir->inode, &e, sizeof e, ofs) != sizeof e)
   {
-    printf("%s 4 \n",name);
     goto done;
   }
 
@@ -254,6 +252,7 @@ dir_remove (struct dir *dir, const char *name)
  done:
 
   inode_close (inode);
+  // printf("dir_remove %d\n",success);
   return success;
 }
 

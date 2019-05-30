@@ -345,6 +345,8 @@ syscall_handler (struct intr_frame *f)
 		if(*(uint32_t *)tempesp>PHYS_BASE)
 			thread_exit();
 		char *file;
+		struct dir* prevdir = dir_makesure();
+		// printf("START remove, in %d\n",dir_makesure()->inode->sector);
 
 		file = palloc_get_page (0);
 		if (file == NULL)
@@ -367,13 +369,15 @@ syscall_handler (struct intr_frame *f)
 				palloc_free_page(fn_copy);
 				break;
 			}
-			dir_close(thread_current()->curr_dir);
-
+			// dir_close(thread_current()->curr_dir);
+			dir_open_root();
 			char *token, *save_ptr, *prev=NULL;
 			bool fail=false;
+			// printf("beFORE for loop, in %d | saved %d\n",dir_makesure()->inode->sector,prevdir->inode->sector);
 			for (token = strtok_r (fn_copy, "/", &save_ptr); token != NULL;
 					 token = strtok_r (NULL, "/", &save_ptr))
 			{
+				// printf("CHECK, in %d | saved %d\n",dir_makesure()->inode->sector,prevdir->inode->sector);
 				if(prev!=NULL)
 				{
 					struct inode *inode = NULL;
@@ -385,6 +389,7 @@ syscall_handler (struct intr_frame *f)
 							break;
 						}
 						dir_open(inode);
+						// printf("open %s\n",prev);
 					}
 					else
 					{
@@ -394,21 +399,30 @@ syscall_handler (struct intr_frame *f)
 				}
 				prev=token;
 			}
+			// printf("prev %s\n",prev);
 			if(fail)
 			{
 				f->eax=false;
+				thread_current()->curr_dir=prevdir;
 				palloc_free_page(fn_copy);
 				palloc_free_page(file);
 				break;
 			}
 			else
 			{
+
+				// thread_current()->curr_dir=prevdir;
+				// printf("JUST above remove, in %d | saved %d\n",dir_makesure()->inode->sector,prevdir->inode->sector);
 				lock_acquire(&handlesem);
 				bool answer = filesys_remove(prev);
 				lock_release(&handlesem);
+				thread_current()->curr_dir=prevdir;
 				f->eax=answer;
+				// printf("AFTER remove, in %d\n",dir_makesure()->inode->sector);
+
 				palloc_free_page(fn_copy);
 				palloc_free_page(file);
+
 				break;
 			}
 
@@ -447,6 +461,7 @@ syscall_handler (struct intr_frame *f)
 				if(fail)
 				{
 					f->eax=false;
+					thread_current()->curr_dir=prevdir;
 					palloc_free_page(fn_copy);
 					palloc_free_page(file);
 					break;
@@ -457,6 +472,7 @@ syscall_handler (struct intr_frame *f)
 					bool answer = filesys_remove(prev);
 					lock_release(&handlesem);
 					f->eax=answer;
+					thread_current()->curr_dir=prevdir;
 					palloc_free_page(fn_copy);
 					palloc_free_page(file);
 					break;
@@ -469,6 +485,7 @@ syscall_handler (struct intr_frame *f)
 				palloc_free_page(fn_copy);
 				lock_release(&handlesem);
 				f->eax=answer;
+				thread_current()->curr_dir=prevdir;
 				palloc_free_page(file);
 				break;
 			}
@@ -476,27 +493,13 @@ syscall_handler (struct intr_frame *f)
 
 
 		}
-
-
-
-
-
-
-
-		// lock_acquire(&handlesem);
-		// bool answer = filesys_remove(file);
-		// lock_release(&handlesem);
-		//
-		// f->eax=answer;
-		// palloc_free_page(file);
-		// barrier();
-		// break;
 	}
-	case SYS_OPEN:
+		case SYS_OPEN:
 	{
 		char* tempesp = (char *)f->esp;
 		tempesp+=4;
 		struct dir* prevdir = dir_makesure();
+		// printf("START OPEN. I'm in %d\n",dir_makesure()->inode->sector);
 		if(*(uint32_t *)tempesp>PHYS_BASE)
 		{
 			thread_current()->returnstatus=-1;
@@ -541,6 +544,7 @@ syscall_handler (struct intr_frame *f)
 					return TID_ERROR;
 				strlcpy (fn_copy, file, PGSIZE); // Copy filename
 				char *token, *save_ptr, *prev=NULL;
+				dir_open_root();
 				for (token = strtok_r (fn_copy, "/", &save_ptr); token != NULL;
 						 token = strtok_r (NULL, "/", &save_ptr))
 				{
@@ -626,9 +630,11 @@ syscall_handler (struct intr_frame *f)
 	  		barrier();
 			}
     }
-		printf("Before RECOVER curr_dir = %d\n",dir_makesure()->inode->sector);
+		// printf("JUST before RECOVER curr_dir = %d\n",dir_makesure()->inode->sector);
 		thread_current()->curr_dir=prevdir;
-		printf("AFTER RECOVER curr_dir = %d\n",dir_makesure()->inode->sector);
+		// printf("END OPEN. I'm in %d\n",dir_makesure()->inode->sector);
+		// printf("OPENEDFILE %p\n",openedfile);
+		// printf("AFTER RECOVER curr_dir = %d\n",dir_makesure()->inode->sector);
 
 
 		int fd;
@@ -1070,11 +1076,11 @@ syscall_handler (struct intr_frame *f)
 		}
 		strlcpy (dirname, *(char **)tempesp, PGSIZE);
 		struct inode *inode = NULL;
-		printf("Before lookup. name :%s | dir_sector : %d \n", dirname, dir_makesure()->inode->sector);
+		// printf("Before lookup. name :%s | dir_sector : %d \n", dirname, dir_makesure()->inode->sector);
 		if(!dir_lookup(dir_makesure(),dirname,&inode))
 		{
 
-			printf("NOT EXISTED. name :%s | dir_sector : %d \n", dirname, dir_makesure()->inode->sector);
+			// printf("NOT EXISTED. name :%s | dir_sector : %d \n", dirname, dir_makesure()->inode->sector);
 			f->eax=false;
 		}
 		else
@@ -1083,12 +1089,13 @@ syscall_handler (struct intr_frame *f)
 			{
 				dir_open(inode);
 				f->eax=true;
-				printf("OPEN directory %s success\n",dirname);
+				// printf("OPEN directory %s success\n",dirname);
 			}
 			else
 				f->eax=false;
 		}
 		palloc_free_page(dirname);
+		// printf("After chdir, I'm in %d\n",dir_makesure()->inode->sector);
 		break;
 	}
 	case SYS_MKDIR:
@@ -1261,7 +1268,7 @@ syscall_handler (struct intr_frame *f)
 				break;
 			}
 			struct dir* prevdir=dir_makesure();
-			printf("Before readdir. dir_sector : %d \n", dir_makesure()->inode->sector);
+			// printf("Before readdir. dir_sector : %d \n", dir_makesure()->inode->sector);
 			bool opensuc= dir_open(file_dir->inode->sector)!=NULL;
 
 
@@ -1273,7 +1280,7 @@ syscall_handler (struct intr_frame *f)
 			}
 
 
-			printf("AFTER readdir. dir_sector : %d \n", dir_makesure()->inode->sector);
+			// printf("AFTER readdir. dir_sector : %d \n", dir_makesure()->inode->sector);
 			f->eax=answer;
 			break;
 
