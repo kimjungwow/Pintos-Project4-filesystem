@@ -40,19 +40,27 @@ struct dir *
 dir_open (struct inode *inode)
 {
   // if(thread_current()->curr_dir!=NULL)
-  //   dir_close(thread_current()->curr_dir);
+  // {
+  //   inode_close (thread_current()->curr_dir->inode);
+  //   free (thread_current()->curr_dir);
+  // }
   struct dir *dir = calloc (1, sizeof *dir);
   if (inode != NULL && dir != NULL)
     {
       dir->inode = inode;
       dir->pos = 0;
       thread_current()->curr_dir=dir;
+      inode->data.dir = dir;
+      inode->open_cnt++;
+      // printf("SET %d | %d \n", inode->data.dir->inode->sector,inode->sector);
       return dir;
     }
   else
     {
+      // printf("dir_open return NULL. dir %p | inode %p\n",dir,inode);
       inode_close (inode);
       free (dir);
+
       return NULL;
     }
 }
@@ -86,6 +94,7 @@ dir_close (struct dir *dir)
   // thread_current()->curr_dir=
   dir_open_root();
 }
+
 
 /* Returns the inode encapsulated by DIR. */
 struct inode *
@@ -194,8 +203,8 @@ dir_add (struct dir *dir, const char *name, disk_sector_t inode_sector)
   success = inode_write_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
 
  done:
-
-  // printf("dir_add %d\n",success);
+  // if(!success)
+  //   printf("dir_add %d\n",success);
   return success;
 }
 
@@ -205,6 +214,7 @@ dir_add (struct dir *dir, const char *name, disk_sector_t inode_sector)
 bool
 dir_remove (struct dir *dir, const char *name)
 {
+  // printf("dir_remove : dir (%d) name (%s)\n",dir->inode->sector,name);
   struct dir_entry e;
   struct inode *inode = NULL;
   bool success = false;
@@ -220,7 +230,10 @@ dir_remove (struct dir *dir, const char *name)
   /* Open inode. */
   inode = inode_open (e.inode_sector);
   if (inode == NULL)
+  {
+    e.in_use = false;
     goto done;
+  }
 
   if(inode->data.isdir)
   {
@@ -234,7 +247,7 @@ dir_remove (struct dir *dir, const char *name)
         pos += sizeof ee;
         if (ee.in_use)
           {
-            // printf("USE | %s\n",name);
+            // printf("USE | %s in %s\n",ee.name, name);
             many++;
           }
       }
@@ -242,6 +255,35 @@ dir_remove (struct dir *dir, const char *name)
     if(many>=3)
     {
       goto done;
+/*
+      int j;
+      printf("Let's check %s \n",ee.name);
+      struct inode *emptydir = inode_open(ee.inode_sector);
+
+      off_t emptydir_pos=0;
+      struct dir_entry eee;
+      int emptymany=0;
+      printf("Let's check %s Isdir? = %d\n",ee.name,emptydir->data.isdir);
+      if(emptydir->data.isdir==true)
+      {
+        while (inode_read_at (emptydir, &eee, sizeof eee, emptydir_pos) == sizeof eee)
+          {
+            emptydir_pos += sizeof eee;
+            if (eee.in_use)
+              {
+                printf("2 USE | %s in %s\n",eee.name, ee.name);
+                emptymany++;
+              }
+          }
+        printf("EMPTYMANY %d\n",emptymany);
+        if(emptymany>=3)
+          goto done;
+        else
+          many--;
+      }
+      else
+        goto done;*/
+
     }
 
   }
@@ -260,6 +302,7 @@ dir_remove (struct dir *dir, const char *name)
 
  done:
 
+
   inode_close (inode);
   // printf("dir_remove %d\n",success);
   return success;
@@ -272,11 +315,13 @@ bool
 dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
 {
   struct dir_entry e;
+  // printf("READDIR : %d\n",dir->inode->sector);
 
   while (inode_read_at (dir->inode, &e, sizeof e, dir->pos) == sizeof e)
     {
       dir->pos += sizeof e;
-      if (e.in_use)
+      // printf("%u while | use %d | name %s\n",dir->pos,e.in_use,e.name);
+      if (e.in_use && strcmp(e.name,".")!=0 && strcmp(e.name,"..")!=0 )
         {
           strlcpy (name, e.name, NAME_MAX + 1);
           return true;

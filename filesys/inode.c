@@ -63,7 +63,7 @@ byte_to_sector (const struct inode *inode, off_t pos)
   {
     return *(inode->data.start);
   }
-  else if(currentsectors<124)
+  else if(currentsectors<=122)
   {
     // printf("\nNow less than 124!!!\nReturn : %u | target sector is %u with position %u\n Because start is %u\n",*(inode->data.start+targetsector-1),targetsector,pos,*(inode->data.start));
     return *(inode->data.start+targetsector-1);
@@ -121,7 +121,7 @@ inode_grow(disk_sector_t sector, struct inode_disk* disk_inode, off_t length)
   // disk_sector_t* zerobuffer = calloc(1,DISK_SECTOR_SIZE);
   static char zeros[DISK_SECTOR_SIZE];
 
-  if(neededsectors<124)
+  if(neededsectors<=122)
   {
     // Use direct pointer
     for (i=currentsectors;i<neededsectors;i++)
@@ -243,12 +243,12 @@ inode_open (disk_sector_t sector)
           return inode;
         }
     }
-
+  // printf("MAlloc Before\n");
   /* Allocate memory. */
   inode = malloc (sizeof *inode);
   if (inode == NULL)
     return NULL;
-
+  // printf("MAlloc after\n");
   /* Initialize. */
   list_push_front (&open_inodes, &inode->elem);
   inode->sector = sector;
@@ -312,7 +312,7 @@ inode_close (struct inode *inode)
           free_map_release (inode->sector, 1);
 
           size_t currentsectors = bytes_to_sectors(inode->data.length);
-          if(currentsectors<124)
+          if(currentsectors<=122)
           {
 
             for (i=0;i<currentsectors;i++)

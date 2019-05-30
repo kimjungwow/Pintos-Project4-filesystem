@@ -27,6 +27,8 @@ file_open (struct inode *inode)
       file->inode = inode;
       file->pos = 0;
       file->deny_write = false;
+      inode->open_cnt++;
+
       return file;
     }
   else
@@ -53,6 +55,7 @@ file_close (struct file *file)
   if (file != NULL)
     {
       file_allow_write (file);
+
       inode_close (file->inode);
       free (file);
     }
