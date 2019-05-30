@@ -534,5 +534,17 @@ inode_allow_write (struct inode *inode)
 off_t
 inode_length (const struct inode *inode)
 {
+
+
+
+/*
+  struct buffer_cache_entry *bce = buffer_cache_check(filesys_disk,inode_get_inumber(inode),false);
+  lock_acquire(&bce->entry_lock);
+  struct inode_disk* ptr =(struct inode_disk*)bce;
+  off_t answer = ptr->length;
+  lock_release(&bce->entry_lock);
+  return answer;
+  */
   return inode->data.length;
+
 }

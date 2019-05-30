@@ -28,6 +28,8 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
+#define FILES_MAX 128
+
 /* A kernel thread or user process.
 
    Each thread structure is stored in its own 4 kB page.  The
@@ -101,7 +103,7 @@ struct thread
     uint32_t *pagedir;                  /* Page directory. */
     uint32_t *process_stack;
     int returnstatus;
-    struct file* fdtable[64];
+    struct file* fdtable[FILES_MAX];
     int nextfd;
     struct list childrenlist;
     struct list_elem child_elem;

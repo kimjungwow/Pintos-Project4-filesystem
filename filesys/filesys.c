@@ -85,10 +85,11 @@ filesys_open (const char *name)
   struct inode *inode = NULL;
 
 
+
   if (dir != NULL)
     dir_lookup (dir, name, &inode);
   dir_close (dir);
-
+  // printf("TRY to open %s in dir %d. inode %p\n",name, dir->inode->sector,inode);
 
   return file_open (inode);
 }

@@ -19,9 +19,11 @@
 struct file *
 file_open (struct inode *inode)
 {
+  // printf("IN file_open\n");
   struct file *file = calloc (1, sizeof *file);
   if (inode != NULL && file != NULL)
     {
+      // printf("SHould be true..\n");
       file->inode = inode;
       file->pos = 0;
       file->deny_write = false;
@@ -29,7 +31,7 @@ file_open (struct inode *inode)
     }
   else
     {
-      // printf("file_open =-> NULL\n");
+      // printf("file_open =-> NULL\n inode = %p | file = %p\n",inode,file);
       inode_close (inode);
       free (file);
       return NULL;

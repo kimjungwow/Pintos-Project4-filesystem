@@ -178,6 +178,15 @@ dir_add (struct dir *dir, const char *name, disk_sector_t inode_sector)
     if (!e.in_use) // Find free slot!
       break;
 
+  if(ofs>=inode_length(dir->inode))
+  {
+    // printf("FULL\n\n");
+    inode_grow(dir->inode->sector,&dir->inode->data,inode_length(dir->inode)+sizeof e);
+    inode_read_at (dir->inode, &e, sizeof e, ofs);
+    ofs+=sizeof e;
+  }
+
+
   /* Write slot. */
   e.in_use = true;
   strlcpy (e.name, name, sizeof e.name);

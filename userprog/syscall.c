@@ -494,7 +494,7 @@ syscall_handler (struct intr_frame *f)
 
 		}
 	}
-		case SYS_OPEN:
+			case SYS_OPEN:
 	{
 		char* tempesp = (char *)f->esp;
 		tempesp+=4;
@@ -566,7 +566,7 @@ syscall_handler (struct intr_frame *f)
 				}
 				lock_acquire(&handlesem);
 				openedfile = filesys_open(prev);
-				// printf("\nOPEN %s\n\n",file);
+				// printf("\nOPEN %p\n\n",openedfile);
 				lock_release(&handlesem);
 				filenum++;
 				palloc_free_page(fn_copy);
@@ -636,7 +636,7 @@ syscall_handler (struct intr_frame *f)
 		// printf("OPENEDFILE %p\n",openedfile);
 		// printf("AFTER RECOVER curr_dir = %d\n",dir_makesure()->inode->sector);
 
-
+		// printf("current fd %d \n",thread_current()->nextfd);
 		int fd;
 		if (openedfile==NULL)
 		{
@@ -649,7 +649,8 @@ syscall_handler (struct intr_frame *f)
 		else
 		{
 			fd= thread_current()->nextfd;
-			if(fd>=64)
+
+			if(fd>=FILES_MAX) // Problem is here..
 			{
 				fd=-1;
 				lock_acquire(&handlesem);
@@ -701,7 +702,7 @@ syscall_handler (struct intr_frame *f)
 		tempesp+=4;
 		int fd = *(int *)tempesp;
 		tempesp+=4;
-		if((fd<0)||(fd>64))
+		if((fd<0)||(fd>FILES_MAX))
 		{
 			thread_current()->returnstatus=-1;
 			thread_exit();
@@ -889,7 +890,7 @@ syscall_handler (struct intr_frame *f)
 		char* tempesp = (char *)f->esp;
 		tempesp+=4;
 		int fd = *(int *)tempesp;
-		if((fd<0)||(fd>64))
+		if((fd<0)||(fd>FILES_MAX))
 		{
 			thread_current()->returnstatus=-1;
 			thread_exit();
@@ -921,7 +922,7 @@ syscall_handler (struct intr_frame *f)
 		tempesp+=4;
 		int fd = *(int *)tempesp;
 		tempesp+=4;
-		if((fd<2)||(fd>64)||thread_current()->fdtable[fd]==NULL)
+		if((fd<2)||(fd>FILES_MAX)||thread_current()->fdtable[fd]==NULL)
 		{
 			f->eax=MAP_FAILED;
 			break;

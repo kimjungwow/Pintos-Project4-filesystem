@@ -256,7 +256,7 @@ process_exit (void)
 	}
 
 	int j;
-	for (j=0; j<64; j++)
+	for (j=0; j<FILES_MAX; j++)
 	{
 		struct file* ftoclose = curr->fdtable[j];
 		if (ftoclose!=NULL)
